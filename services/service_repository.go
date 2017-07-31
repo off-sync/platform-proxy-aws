@@ -1,19 +1,20 @@
-package infra
+package services
 
 import (
 	"fmt"
 	"strconv"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ecs"
+
+	"github.com/off-sync/platform-proxy-aws/interfaces"
 	"github.com/off-sync/platform-proxy-domain/services"
 )
 
 // ServiceRepository implements the ServiceRepository interface using an AWS ECS
 // cluster as its backend.
 type ServiceRepository struct {
-	ecsSvc  *ecs.ECS
-	cluster *ecs.Cluster
+	// AWS ECS API
+	api interfaces.AwsEcsAPI
 
 	// Configuration
 	serverContainerName string
@@ -21,41 +22,29 @@ type ServiceRepository struct {
 	defaultPort         int
 }
 
+// Default values for the ServiceRepository struct.
+const (
+	DefaultServerContainerName = "server"
+	DefaultDockerLabelPort     = "com.off-sync.platform.proxy.port"
+	DefaultDefaultPort         = 8080
+)
+
 // ServiceRepositoryOption defines the type used to further configure a
 // ServiceRepository.
 type ServiceRepositoryOption func(*ServiceRepository) error
 
 // NewServiceRepository creates a new service repository based on the provided
-// AWS ECS client and cluster name.
-func NewServiceRepository(
-	ecsSvc *ecs.ECS,
-	clusterName string,
-	options ...ServiceRepositoryOption) (*ServiceRepository, error) {
-	clusters, err := ecsSvc.DescribeClusters(&ecs.DescribeClustersInput{
-		Clusters: []*string{aws.String(clusterName)},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if len(clusters.Failures) > 0 {
-		return nil, fmt.Errorf("checking cluster: %s", *clusters.Failures[0].Reason)
-	}
-
-	if len(clusters.Clusters) < 1 {
-		return nil, fmt.Errorf("cluster not found: %s", clusterName)
-	}
-
+// AWS ECS API.
+func NewServiceRepository(api interfaces.AwsEcsAPI, options ...ServiceRepositoryOption) (*ServiceRepository, error) {
 	r := &ServiceRepository{
-		ecsSvc:              ecsSvc,
-		cluster:             clusters.Clusters[0],
-		serverContainerName: "server",
-		dockerLabelPort:     "com.off-sync.platform.proxy.port",
-		defaultPort:         8080,
+		api:                 api,
+		serverContainerName: DefaultServerContainerName,
+		dockerLabelPort:     DefaultDockerLabelPort,
+		defaultPort:         DefaultDefaultPort,
 	}
 
 	for _, opt := range options {
-		err = opt(r)
+		err := opt(r)
 		if err != nil {
 			return nil, err
 		}
@@ -93,55 +82,32 @@ func WithDefaultPort(port int) ServiceRepositoryOption {
 
 // ListServices returns all service names contained in this repository.
 func (r *ServiceRepository) ListServices() ([]string, error) {
-	var serviceNames []string
-
-	err := r.ecsSvc.ListServicesPages(&ecs.ListServicesInput{
-		Cluster: r.cluster.ClusterName,
-	}, func(output *ecs.ListServicesOutput, lastPage bool) bool {
-		serviceNames = append(serviceNames, aws.StringValueSlice(output.ServiceArns)...)
-		return true
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return serviceNames, nil
+	return r.api.ListServices()
 }
 
 // DescribeService returns the service with the specified name. If no service
 // exists with that name an ErrUnknownService is returned.
 func (r *ServiceRepository) DescribeService(name string) (*services.Service, error) {
-	serviceDescription, err := r.ecsSvc.DescribeServices(&ecs.DescribeServicesInput{
-		Cluster:  r.cluster.ClusterName,
-		Services: aws.StringSlice([]string{name}),
-	})
+	service, err := r.api.DescribeService(name)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(serviceDescription.Services) < 1 {
-		return nil, fmt.Errorf("service not found for name: %s", name)
-	}
-
-	service := serviceDescription.Services[0]
-
-	serverURL, err := r.getTaskDefinitionServer(service.TaskDefinition)
+	serverURL, err := r.getTaskDefinitionServerURL(aws.StringValue(service.TaskDefinition))
 	if err != nil {
 		return nil, err
 	}
 
-	return services.NewService(aws.StringValue(service.ServiceName), serverURL)
+	return services.NewService(name, serverURL)
 }
 
-func (r *ServiceRepository) getTaskDefinitionServer(taskDefArn *string) (string, error) {
-	tdef, err := r.ecsSvc.DescribeTaskDefinition(&ecs.DescribeTaskDefinitionInput{
-		TaskDefinition: taskDefArn,
-	})
+func (r *ServiceRepository) getTaskDefinitionServerURL(taskDefArn string) (string, error) {
+	tdef, err := r.api.DescribeTaskDefinition(taskDefArn)
 	if err != nil {
 		return "", err
 	}
 
-	for _, cdef := range tdef.TaskDefinition.ContainerDefinitions {
+	for _, cdef := range tdef.ContainerDefinitions {
 		if aws.StringValue(cdef.Name) != r.serverContainerName {
 			// not the server
 			continue
@@ -160,5 +126,5 @@ func (r *ServiceRepository) getTaskDefinitionServer(taskDefArn *string) (string,
 		return fmt.Sprintf("http://%s:%d", *cdef.Hostname, port), nil
 	}
 
-	return "", nil
+	return "", fmt.Errorf("no server container found for task definition: %s", taskDefArn)
 }
