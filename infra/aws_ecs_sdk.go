@@ -4,7 +4,18 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ecs"
+	"github.com/spf13/viper"
+)
+
+// Configuration keys.
+const (
+	awsID          = "awsID"
+	awsSecret      = "awsSecret"
+	awsRegion      = "awsRegion"
+	ecsClusterName = "ecsClusterName"
 )
 
 // AwsEcsSdk implements the AwsEcsAPI.
@@ -13,9 +24,9 @@ type AwsEcsSdk struct {
 	cluster *ecs.Cluster
 }
 
-// NewAwsEcsClient creates a new AwsEcsSdk using the provided ECS service and
+// NewAwsEcsSdk creates a new AwsEcsSdk using the provided ECS service and
 // cluster name. It returns an error if the cluster cannot be described.
-func NewAwsEcsClient(ecsSvc *ecs.ECS, clusterName string) (*AwsEcsSdk, error) {
+func NewAwsEcsSdk(ecsSvc *ecs.ECS, clusterName string) (*AwsEcsSdk, error) {
 	clusters, err := ecsSvc.DescribeClusters(&ecs.DescribeClustersInput{
 		Clusters: []*string{aws.String(clusterName)},
 	})
@@ -81,4 +92,21 @@ func (s *AwsEcsSdk) DescribeTaskDefinition(taskDefArn string) (*ecs.TaskDefiniti
 	}
 
 	return tdef.TaskDefinition, nil
+}
+
+// NewAwsEcsSdkFromConfig creates a new AwsEcsSdk using the configuration
+// exposed via viper. The AWS ID, secret, region and cluster name are retrieved
+// from the configuration.
+func NewAwsEcsSdkFromConfig() (*AwsEcsSdk, error) {
+	sess, err := session.NewSession(&aws.Config{
+		Credentials: credentials.NewStaticCredentials(viper.GetString(awsID), viper.GetString(awsSecret), ""),
+		Region:      aws.String(viper.GetString(awsRegion)),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	ecsSvc := ecs.New(sess)
+
+	return NewAwsEcsSdk(ecsSvc, viper.GetString(ecsClusterName))
 }

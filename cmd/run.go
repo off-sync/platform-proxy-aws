@@ -21,15 +21,12 @@
 package cmd
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/off-sync/platform-proxy-app/infra/logging"
 	"github.com/off-sync/platform-proxy-app/proxies/cmd/startproxy"
 	"github.com/off-sync/platform-proxy-aws/infra"
+	"github.com/off-sync/platform-proxy-aws/services"
 )
 
 // runCmd represents the run command
@@ -55,20 +52,31 @@ func init() {
 }
 
 func run(cmd *cobra.Command, args []string) {
-	sess, err := session.NewSession(&aws.Config{Region: aws.String(viper.GetString("awsRegion"))})
+	api, err := infra.NewAwsEcsSdkFromConfig()
 	if err != nil {
-		logger.WithError(err).Fatal("creating new session")
+		logger.
+			WithError(err).
+			Fatal("creating AWS ECS API")
+
+		return
 	}
 
-	ecsSvc := ecs.New(sess)
-
-	serviceRepository, err := infra.NewServiceRepository(ecsSvc, viper.GetString("ecsClusterName"))
+	serviceRepository, err := services.NewServiceRepository(api)
 	if err != nil {
 		logger.
 			WithError(err).
 			Fatal("creating service repository")
 
 		return
+	}
+
+	svcs, err := serviceRepository.ListServices()
+	if err != nil {
+		logger.WithError(err).Error("listing services")
+	} else {
+		for _, svc := range svcs {
+			logger.WithField("name", svc).Info("found service")
+		}
 	}
 
 	startProxyCmd, err := startproxy.NewCommand(

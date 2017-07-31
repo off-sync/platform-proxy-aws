@@ -97,10 +97,11 @@ func initConfig() {
 func initLog() {
 	l, err := logrus.ParseLevel(logLevel)
 	if err != nil {
-		fmt.Printf("Invalid log level '%s': using default log level 'Info'")
+		fmt.Printf("Invalid log level '%s': using default log level 'Info'", logLevel)
 		l = logrus.InfoLevel
 	}
 
 	logger = logrus.New()
 	logger.Level = l
+	logger.Formatter = &logrus.JSONFormatter{}
 }
