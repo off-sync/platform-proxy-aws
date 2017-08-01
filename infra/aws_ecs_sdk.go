@@ -10,14 +10,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Configuration keys.
-const (
-	awsID          = "awsID"
-	awsSecret      = "awsSecret"
-	awsRegion      = "awsRegion"
-	ecsClusterName = "ecsClusterName"
-)
-
 // AwsEcsSdk implements the AwsEcsAPI.
 type AwsEcsSdk struct {
 	ecsSvc  *ecs.ECS

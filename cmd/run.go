@@ -22,9 +22,11 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/off-sync/platform-proxy-app/infra/logging"
 	"github.com/off-sync/platform-proxy-app/proxies/cmd/startproxy"
+	"github.com/off-sync/platform-proxy-aws/frontends"
 	"github.com/off-sync/platform-proxy-aws/infra"
 	"github.com/off-sync/platform-proxy-aws/services"
 )
@@ -52,7 +54,7 @@ func init() {
 }
 
 func run(cmd *cobra.Command, args []string) {
-	api, err := infra.NewAwsEcsSdkFromConfig()
+	ecsAPI, err := infra.NewAwsEcsSdkFromConfig()
 	if err != nil {
 		logger.
 			WithError(err).
@@ -61,7 +63,16 @@ func run(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	serviceRepository, err := services.NewServiceRepository(api)
+	dynAPI, err := infra.NewAwsDynamoDBSdkFromConfig()
+	if err != nil {
+		logger.
+			WithError(err).
+			Fatal("creating AWS DynamoDB API")
+
+		return
+	}
+
+	serviceRepository, err := services.NewServiceRepository(ecsAPI)
 	if err != nil {
 		logger.
 			WithError(err).
@@ -79,9 +90,27 @@ func run(cmd *cobra.Command, args []string) {
 		}
 	}
 
+	frontendRepository, err := frontends.NewFrontendRepository(dynAPI, viper.GetString("dyndbFrontendsTable"))
+	if err != nil {
+		logger.
+			WithError(err).
+			Fatal("creating frontend repository")
+
+		return
+	}
+
+	frontends, err := frontendRepository.ListFrontends()
+	if err != nil {
+		logger.WithError(err).Error("listing frontends")
+	} else {
+		for _, frontend := range frontends {
+			logger.WithField("name", frontend).Info("found frontend")
+		}
+	}
+
 	startProxyCmd, err := startproxy.NewCommand(
 		serviceRepository,
-		nil,
+		frontendRepository,
 		logging.NewLogrusLogger(logger))
 	if err != nil {
 		logger.WithError(err).Fatal("creating start proxy command")
