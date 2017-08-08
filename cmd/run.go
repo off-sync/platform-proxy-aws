@@ -21,6 +21,9 @@
 package cmd
 
 import (
+	"context"
+	"time"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -29,28 +32,47 @@ import (
 	"github.com/off-sync/platform-proxy-aws/frontends"
 	"github.com/off-sync/platform-proxy-aws/infra"
 	"github.com/off-sync/platform-proxy-aws/services"
+	"github.com/off-sync/platform-proxy-aws/webservers"
 )
 
 // runCmd represents the run command
 var runCmd = &cobra.Command{
 	Use:   "run",
-	Short: "Runs the Off-Sync.com Platform Proxy for AWS",
+	Short: "Runs the Off-Sync.com Platform Proxy for Amazon Web Services",
 	Long:  ``,
 	Run:   run,
 }
 
+// Configuration keys and defaults.
+const (
+	KeyPollingDuration     = "polling-duration"
+	DefaultPollingDuration = 300
+	KeyPort                = "port"
+	DefaultPort            = 80
+	KeySecurePort          = "secure-port"
+	DefaultSecurePort      = 443
+)
+
 func init() {
 	RootCmd.AddCommand(runCmd)
 
-	// Here you will define your flags and configuration settings.
+	// polling duration flag and configuration
+	runCmd.Flags().Int32P(KeyPollingDuration, "d", DefaultPollingDuration, "Polling duration in seconds")
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// runCmd.PersistentFlags().String("foo", "", "A help for foo")
+	viper.SetDefault(KeyPollingDuration, DefaultPollingDuration)
+	viper.BindPFlag(KeyPollingDuration, runCmd.Flags().Lookup(KeyPollingDuration))
 
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// runCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// HTTP port flag and configuration
+	runCmd.Flags().Int32P(KeyPort, "p", DefaultPort, "Port used by the Web Server")
+
+	viper.SetDefault(KeyPort, DefaultPort)
+	viper.BindPFlag(KeyPort, runCmd.Flags().Lookup(KeyPort))
+
+	// HTTPS port flag and configuration
+	runCmd.Flags().Int32P(KeySecurePort, "s", DefaultSecurePort, "Port used by the Secure Web Server")
+
+	viper.SetDefault(KeySecurePort, DefaultSecurePort)
+	viper.BindPFlag(KeySecurePort, runCmd.Flags().Lookup(KeySecurePort))
 }
 
 func run(cmd *cobra.Command, args []string) {
@@ -118,5 +140,18 @@ func run(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	startProxyCmd.Execute(&startproxy.Model{})
+	ctx, cancel := context.WithCancel(context.Background())
+
+	err = startProxyCmd.Execute(&startproxy.Model{
+		Ctx:             ctx,
+		PollingDuration: time.Duration(viper.GetInt(KeyPollingDuration)) * time.Second,
+		LoadBalancer:    nil,
+		SecureWebServer: nil,
+		WebServer:       webservers.NewWebServer(viper.GetInt(KeyPort)),
+	})
+	if err != nil {
+		logger.WithError(err).Fatal("executing start proxy command")
+	}
+
+	cancel()
 }

@@ -37,16 +37,8 @@ var logger *logrus.Logger
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
 	Use:   "platform-proxy-aws",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	//	Run: func(cmd *cobra.Command, args []string) { },
+	Short: "The Off-Sync.com Platform Proxy for Amazon Web Services",
+	Long:  ``,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -64,8 +56,8 @@ func init() {
 		initLog)
 
 	// Global flags
-	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.platform-proxy-aws.yaml)")
-	RootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "Info", "log level (default is Info)")
+	RootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "C", "", "config file (default $HOME/.platform-proxy-aws.yaml)")
+	RootCmd.PersistentFlags().StringVarP(&logLevel, "log-level", "L", "Info", "log level")
 }
 
 // initConfig reads in config file and ENV variables if set.
