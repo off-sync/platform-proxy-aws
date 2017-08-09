@@ -31,7 +31,6 @@ import (
 )
 
 var cfgFile string
-var logLevel string
 var logger *logrus.Logger
 
 // RootCmd represents the base command when called without any subcommands
@@ -57,7 +56,14 @@ func init() {
 
 	// Global flags
 	RootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "C", "", "config file (default $HOME/.platform-proxy-aws.yaml)")
-	RootCmd.PersistentFlags().StringVarP(&logLevel, "log-level", "L", "Info", "log level")
+
+	RootCmd.PersistentFlags().StringP("log-level", "L", "Info", "log level")
+	viper.SetDefault("logLevel", "Info")
+	viper.BindPFlag("logLevel", RootCmd.PersistentFlags().Lookup("log-level"))
+
+	RootCmd.PersistentFlags().BoolP("log-json", "J", true, "use JSON log format")
+	viper.SetDefault("logJSON", true)
+	viper.BindPFlag("logJSON", RootCmd.PersistentFlags().Lookup("log-json"))
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -87,6 +93,8 @@ func initConfig() {
 }
 
 func initLog() {
+	logLevel := viper.GetString("logLevel")
+
 	l, err := logrus.ParseLevel(logLevel)
 	if err != nil {
 		fmt.Printf("Invalid log level '%s': using default log level 'Info'", logLevel)
@@ -95,5 +103,8 @@ func initLog() {
 
 	logger = logrus.New()
 	logger.Level = l
-	logger.Formatter = &logrus.JSONFormatter{}
+
+	if viper.GetBool("logJSON") {
+		logger.Formatter = &logrus.JSONFormatter{}
+	}
 }

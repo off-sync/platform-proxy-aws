@@ -8,7 +8,7 @@
 // furnished to do so, subject to the following conditions:
 //
 // The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
+// all copies or substantial Addrions of the Software.
 //
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -31,6 +31,7 @@ import (
 	"github.com/off-sync/platform-proxy-app/proxies/cmd/startproxy"
 	"github.com/off-sync/platform-proxy-aws/frontends"
 	"github.com/off-sync/platform-proxy-aws/infra"
+	"github.com/off-sync/platform-proxy-aws/loadbalancers"
 	"github.com/off-sync/platform-proxy-aws/services"
 	"github.com/off-sync/platform-proxy-aws/webservers"
 )
@@ -47,10 +48,10 @@ var runCmd = &cobra.Command{
 const (
 	KeyPollingDuration     = "polling-duration"
 	DefaultPollingDuration = 300
-	KeyPort                = "port"
-	DefaultPort            = 80
-	KeySecurePort          = "secure-port"
-	DefaultSecurePort      = 443
+	KeyAddr                = "addr"
+	DefaultAddr            = ":80"
+	KeySecureAddr          = "secure-addr"
+	DefaultSecureAddr      = ":443"
 )
 
 func init() {
@@ -62,17 +63,17 @@ func init() {
 	viper.SetDefault(KeyPollingDuration, DefaultPollingDuration)
 	viper.BindPFlag(KeyPollingDuration, runCmd.Flags().Lookup(KeyPollingDuration))
 
-	// HTTP port flag and configuration
-	runCmd.Flags().Int32P(KeyPort, "p", DefaultPort, "Port used by the Web Server")
+	// HTTP Addr flag and configuration
+	runCmd.Flags().StringP(KeyAddr, "a", DefaultAddr, "Address used by the Web Server")
 
-	viper.SetDefault(KeyPort, DefaultPort)
-	viper.BindPFlag(KeyPort, runCmd.Flags().Lookup(KeyPort))
+	viper.SetDefault(KeyAddr, DefaultAddr)
+	viper.BindPFlag(KeyAddr, runCmd.Flags().Lookup(KeyAddr))
 
-	// HTTPS port flag and configuration
-	runCmd.Flags().Int32P(KeySecurePort, "s", DefaultSecurePort, "Port used by the Secure Web Server")
+	// HTTPS Addr flag and configuration
+	runCmd.Flags().StringP(KeySecureAddr, "s", DefaultSecureAddr, "Address used by the Secure Web Server")
 
-	viper.SetDefault(KeySecurePort, DefaultSecurePort)
-	viper.BindPFlag(KeySecurePort, runCmd.Flags().Lookup(KeySecurePort))
+	viper.SetDefault(KeySecureAddr, DefaultSecureAddr)
+	viper.BindPFlag(KeySecureAddr, runCmd.Flags().Lookup(KeySecureAddr))
 }
 
 func run(cmd *cobra.Command, args []string) {
@@ -145,13 +146,15 @@ func run(cmd *cobra.Command, args []string) {
 	err = startProxyCmd.Execute(&startproxy.Model{
 		Ctx:             ctx,
 		PollingDuration: time.Duration(viper.GetInt(KeyPollingDuration)) * time.Second,
-		LoadBalancer:    nil,
-		SecureWebServer: nil,
-		WebServer:       webservers.NewWebServer(viper.GetInt(KeyPort)),
+		LoadBalancer:    &loadbalancers.LoadBalancer{},
+		SecureWebServer: webservers.NewSecureWebServer(logging.NewLogrusLogger(logger), viper.GetString(KeySecureAddr)),
+		WebServer:       webservers.NewWebServer(logging.NewLogrusLogger(logger), viper.GetString(KeyAddr)),
 	})
 	if err != nil {
 		logger.WithError(err).Fatal("executing start proxy command")
 	}
+
+	time.Sleep(60 * time.Second)
 
 	cancel()
 }
