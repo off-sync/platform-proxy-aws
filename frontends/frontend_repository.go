@@ -98,9 +98,12 @@ func (r *FrontendRepository) DescribeFrontend(name string) (*frontends.Frontend,
 		return nil, err
 	}
 
-	cert, err := frontends.NewCertificate([]byte(f.Certificate), []byte(f.PrivateKey))
-	if err != nil {
-		return nil, err
+	var cert *frontends.Certificate
+	if len(f.Certificate) > 0 && len(f.PrivateKey) > 0 {
+		cert, err = frontends.NewCertificate([]byte(f.Certificate), []byte(f.PrivateKey))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &frontends.Frontend{

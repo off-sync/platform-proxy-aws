@@ -47,7 +47,15 @@ func setUp(t *testing.T) (*FrontendRepository, *interfaces.AwsDynamoDBAPIMock) {
 	})
 	assert.Nil(t, err)
 
-	api.SetTable(tableName, item1, item2, item3, item4, item5)
+	// frontend without certificate
+	item6, err := dynamodbattribute.MarshalMap(map[string]interface{}{
+		"Name":        "frontend6",
+		"ServiceName": "service6",
+		"URL":         "https://frontend6.off-sync.net",
+	})
+	assert.Nil(t, err)
+
+	api.SetTable(tableName, item1, item2, item3, item4, item5, item6)
 
 	r, err := NewFrontendRepository(api, tableName)
 	assert.Nil(t, err)
@@ -76,7 +84,7 @@ func TestFrontendRepositoryListFrontends(t *testing.T) {
 	names, err := r.ListFrontends()
 	assert.Nil(t, err)
 
-	assert.EqualValues(t, []string{"frontend1", "frontend2", "frontend3"}, names)
+	assert.EqualValues(t, []string{"frontend1", "frontend2", "frontend3", "frontend6"}, names)
 }
 
 func TestFrontendRepositoryListFrontendsReturnsErrorWhenScanAllItemsFails(t *testing.T) {
@@ -105,6 +113,22 @@ func TestFrontendRepositoryDescribeFrontend(t *testing.T) {
 		ServiceName: "service1",
 		URL:         url,
 		Certificate: cert,
+	}, f)
+}
+
+func TestFrontendRepositoryDescribeFrontendWithoutCertificate(t *testing.T) {
+	r, _ := setUp(t)
+
+	f, err := r.DescribeFrontend("frontend6")
+	assert.Nil(t, err)
+
+	url, err := url.Parse("https://frontend6.off-sync.net")
+	assert.Nil(t, err)
+
+	assert.EqualValues(t, &frontends.Frontend{
+		Name:        "frontend6",
+		ServiceName: "service6",
+		URL:         url,
 	}, f)
 }
 
