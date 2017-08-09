@@ -7,11 +7,13 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/Sirupsen/logrus"
+	"github.com/off-sync/platform-proxy-app/infra/logging"
 	"github.com/stretchr/testify/assert"
 )
 
 func setUp(t *testing.T) *WebServer {
-	return NewWebServer(0)
+	return NewWebServer(logging.NewLogrusLogger(logrus.New()), ":0")
 }
 
 func TestNewWebServer(t *testing.T) {
