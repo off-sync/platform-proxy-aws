@@ -5,10 +5,12 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/off-sync/platform-proxy-app/interfaces"
@@ -16,8 +18,9 @@ import (
 
 // Errors.
 var (
-	ErrMissingRoute   = errors.New("route must not be nil")
-	ErrMissingHandler = errors.New("handler must not be nil")
+	ErrServerStartupTimout = errors.New("server startup took too long")
+	ErrMissingRoute        = errors.New("route must not be nil")
+	ErrMissingHandler      = errors.New("handler must not be nil")
 )
 
 // WebServer implements the Web Server interface. It uses the Gorilla Mux as
@@ -72,8 +75,34 @@ func (r *webServerRoute) key() string {
 	return fmt.Sprintf("%s|%s", r.url.Hostname(), r.url.Path)
 }
 
+// copied from net/http
+type tcpKeepAliveListener struct {
+	*net.TCPListener
+}
+
+func (ln tcpKeepAliveListener) Accept() (c net.Conn, err error) {
+	tc, err := ln.AcceptTCP()
+	if err != nil {
+		return
+	}
+	tc.SetKeepAlive(true)
+	tc.SetKeepAlivePeriod(3 * time.Minute)
+	return tc, nil
+}
+
 // NewWebServer creates a new Web Server listening on the provided address.
-func NewWebServer(log interfaces.Logger, addr string) *WebServer {
+func NewWebServer(log interfaces.Logger, addr string) (*WebServer, error) {
+	if addr == "" {
+		addr = ":http"
+	}
+
+	// start the listener separately to check whether we can at least bind to
+	// the provided address
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+
 	router := mux.NewRouter()
 	router.StrictSlash(true)
 
@@ -88,13 +117,14 @@ func NewWebServer(log interfaces.Logger, addr string) *WebServer {
 
 	webServer.server.Handler = webServer
 
-	go func() {
-		if err := webServer.server.ListenAndServe(); err != nil {
-			panic(err) // TODO
+	// start the http server
+	go func(ln *net.TCPListener) {
+		if err := webServer.server.Serve(tcpKeepAliveListener{ln}); err != nil {
+			log.WithError(err).Error("serving")
 		}
-	}()
+	}(ln.(*net.TCPListener))
 
-	return webServer
+	return webServer, nil
 }
 
 // ServeHTTP process requests using the configured router.
@@ -122,9 +152,14 @@ func (s *WebServer) reconfigureRoutes() {
 	router := mux.NewRouter()
 
 	for _, route := range s.routes {
+		path := route.url.Path
+		if path == "" {
+			path = "/"
+		}
+
 		router.
+			PathPrefix(path).
 			Host(route.url.Hostname()).
-			PathPrefix(route.url.Path).
 			Handler(route.handler)
 	}
 

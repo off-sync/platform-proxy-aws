@@ -44,36 +44,43 @@ var runCmd = &cobra.Command{
 	Run:   run,
 }
 
-// Configuration keys and defaults.
+// Flags, configuration keys and defaults.
 const (
-	KeyPollingDuration     = "polling-duration"
+	KeyPrefix = "run."
+
+	FlagPollingDuration    = "polling-duration"
+	KeyPollingDuration     = KeyPrefix + "pollingDuration"
 	DefaultPollingDuration = 300
-	KeyAddr                = "addr"
-	DefaultAddr            = ":80"
-	KeySecureAddr          = "secure-addr"
-	DefaultSecureAddr      = ":443"
+
+	FlagAddr    = "addr"
+	KeyAddr     = KeyPrefix + "addr"
+	DefaultAddr = ":80"
+
+	FlagSecureAddr    = "secure-addr"
+	KeySecureAddr     = KeyPrefix + "secureAddr"
+	DefaultSecureAddr = ":443"
 )
 
 func init() {
 	RootCmd.AddCommand(runCmd)
 
 	// polling duration flag and configuration
-	runCmd.Flags().Int32P(KeyPollingDuration, "d", DefaultPollingDuration, "Polling duration in seconds")
+	runCmd.Flags().Int32P(FlagPollingDuration, "d", DefaultPollingDuration, "Polling duration in seconds")
 
 	viper.SetDefault(KeyPollingDuration, DefaultPollingDuration)
-	viper.BindPFlag(KeyPollingDuration, runCmd.Flags().Lookup(KeyPollingDuration))
+	viper.BindPFlag(KeyPollingDuration, runCmd.Flags().Lookup(FlagPollingDuration))
 
 	// HTTP Addr flag and configuration
-	runCmd.Flags().StringP(KeyAddr, "a", DefaultAddr, "Address used by the Web Server")
+	runCmd.Flags().StringP(FlagAddr, "a", DefaultAddr, "Address used by the Web Server")
 
 	viper.SetDefault(KeyAddr, DefaultAddr)
-	viper.BindPFlag(KeyAddr, runCmd.Flags().Lookup(KeyAddr))
+	viper.BindPFlag(KeyAddr, runCmd.Flags().Lookup(FlagAddr))
 
 	// HTTPS Addr flag and configuration
-	runCmd.Flags().StringP(KeySecureAddr, "s", DefaultSecureAddr, "Address used by the Secure Web Server")
+	runCmd.Flags().StringP(FlagSecureAddr, "s", DefaultSecureAddr, "Address used by the Secure Web Server")
 
 	viper.SetDefault(KeySecureAddr, DefaultSecureAddr)
-	viper.BindPFlag(KeySecureAddr, runCmd.Flags().Lookup(KeySecureAddr))
+	viper.BindPFlag(KeySecureAddr, runCmd.Flags().Lookup(FlagSecureAddr))
 }
 
 func run(cmd *cobra.Command, args []string) {

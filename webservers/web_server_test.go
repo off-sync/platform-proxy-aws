@@ -13,7 +13,10 @@ import (
 )
 
 func setUp(t *testing.T) *WebServer {
-	return NewWebServer(logging.NewLogrusLogger(logrus.New()), ":0")
+	s, err := NewWebServer(logging.NewLogrusLogger(logrus.New()), ":0")
+	assert.Nil(t, err)
+
+	return s
 }
 
 func TestNewWebServer(t *testing.T) {
@@ -178,6 +181,22 @@ func _TestWebServerShouldFindWithoutSlash(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rw.Result().StatusCode)
 }
 
+func TestWebServerShouldFindWithoutPath(t *testing.T) {
+	s := setUp(t)
+	handler := newDummyHandler(t, "")
+
+	route, _ := url.Parse("http://localhost")
+
+	err := s.UpsertRoute(route, handler)
+	assert.Nil(t, err)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "http://localhost/", nil)
+
+	s.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Result().StatusCode)
+}
+
 func TestDeleteRouteShouldWorkForUnknownRoute(t *testing.T) {
 	w := setUp(t)
 
@@ -210,4 +229,12 @@ func TestDeleteRouteShouldRemoveExistingRoute(t *testing.T) {
 
 	w.ServeHTTP(rw, req)
 	assert.Equal(t, http.StatusNotFound, rw.Result().StatusCode)
+}
+
+func TestNewWebServerOnBoundAddressShouldFail(t *testing.T) {
+	_, err := NewWebServer(logging.NewLogrusLogger(logrus.New()), ":1234")
+	assert.Nil(t, err)
+
+	_, err = NewWebServer(logging.NewLogrusLogger(logrus.New()), ":1234")
+	assert.NotNil(t, err)
 }

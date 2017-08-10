@@ -11,17 +11,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func setUpSecureWebServer() *SecureWebServer {
-	return NewSecureWebServer(logging.NewLogrusLogger(logrus.New()), ":0")
+func setUpSecureWebServer(t *testing.T) *SecureWebServer {
+	s, err := NewSecureWebServer(logging.NewLogrusLogger(logrus.New()), ":0")
+	assert.Nil(t, err)
+
+	return s
 }
 
 func TestNewSecureWebServer(t *testing.T) {
-	s := setUpSecureWebServer()
+	s := setUpSecureWebServer(t)
 	assert.NotNil(t, s)
 }
 
 func TestSecureWebServerShouldServeHTTP(t *testing.T) {
-	s := setUpSecureWebServer()
+	s := setUpSecureWebServer(t)
 
 	route, _ := url.Parse("http://localhost/api")
 	handler := newDummyHandler(t, "")
@@ -38,7 +41,7 @@ func TestSecureWebServerShouldServeHTTP(t *testing.T) {
 }
 
 func TestSecureWebServerUpsertCertificate(t *testing.T) {
-	s := setUpSecureWebServer()
+	s := setUpSecureWebServer(t)
 
 	cert := getTestCert()
 	assert.NotNil(t, cert)
