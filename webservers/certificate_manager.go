@@ -8,7 +8,7 @@ import (
 )
 
 type certificateManager struct {
-	certificatesLock sync.Mutex
+	certificatesLock sync.RWMutex
 	certificates     map[string]*tls.Certificate
 }
 
@@ -26,4 +26,15 @@ func (m *certificateManager) UpsertCertificate(domainName string, cert *frontend
 	m.certificates[domainName] = cert.Certificate
 
 	return nil
+}
+
+func (m *certificateManager) getCertificate(chi *tls.ClientHelloInfo) (*tls.Certificate, error) {
+	m.certificatesLock.RLock()
+	defer m.certificatesLock.RUnlock()
+
+	if cert, found := m.certificates[chi.ServerName]; found {
+		return cert, nil
+	}
+
+	return nil, nil
 }
