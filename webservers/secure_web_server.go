@@ -20,16 +20,11 @@ type SecureWebServer struct {
 
 // NewSecureWebServer creates a new secure web server listening on the provided
 // address.
-func NewSecureWebServer(log interfaces.Logger, addr string) (*SecureWebServer, error) {
-	webServer, err := NewWebServer(log, addr)
-	if err != nil {
-		return nil, err
-	}
-
+func NewSecureWebServer(log interfaces.Logger, addr string) *SecureWebServer {
 	return &SecureWebServer{
-		WebServer:    webServer,
+		WebServer:    NewWebServer(log, addr),
 		certificates: make(map[string]*tls.Certificate),
-	}, nil
+	}
 }
 
 func (s *SecureWebServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {

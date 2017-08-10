@@ -12,10 +12,7 @@ import (
 )
 
 func setUpSecureWebServer(t *testing.T) *SecureWebServer {
-	s, err := NewSecureWebServer(logging.NewLogrusLogger(logrus.New()), ":0")
-	assert.Nil(t, err)
-
-	return s
+	return NewSecureWebServer(logging.NewLogrusLogger(logrus.New()), ":0")
 }
 
 func TestNewSecureWebServer(t *testing.T) {

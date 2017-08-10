@@ -91,18 +91,7 @@ func (ln tcpKeepAliveListener) Accept() (c net.Conn, err error) {
 }
 
 // NewWebServer creates a new Web Server listening on the provided address.
-func NewWebServer(log interfaces.Logger, addr string) (*WebServer, error) {
-	if addr == "" {
-		addr = ":http"
-	}
-
-	// start the listener separately to check whether we can at least bind to
-	// the provided address
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		return nil, err
-	}
-
+func NewWebServer(log interfaces.Logger, addr string) *WebServer {
 	router := mux.NewRouter()
 	router.StrictSlash(true)
 
@@ -118,13 +107,13 @@ func NewWebServer(log interfaces.Logger, addr string) (*WebServer, error) {
 	webServer.server.Handler = webServer
 
 	// start the http server
-	go func(ln *net.TCPListener) {
-		if err := webServer.server.Serve(tcpKeepAliveListener{ln}); err != nil {
-			log.WithError(err).Error("serving")
+	go func() {
+		if err := webServer.server.ListenAndServe(); err != nil {
+			log.WithError(err).Error("listening and serving")
 		}
-	}(ln.(*net.TCPListener))
+	}()
 
-	return webServer, nil
+	return webServer
 }
 
 // ServeHTTP process requests using the configured router.

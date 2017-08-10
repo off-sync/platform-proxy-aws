@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/off-sync/platform-proxy-app/infra/logging"
@@ -13,10 +14,7 @@ import (
 )
 
 func setUp(t *testing.T) *WebServer {
-	s, err := NewWebServer(logging.NewLogrusLogger(logrus.New()), ":0")
-	assert.Nil(t, err)
-
-	return s
+	return NewWebServer(logging.NewLogrusLogger(logrus.New()), ":0")
 }
 
 func TestNewWebServer(t *testing.T) {
@@ -231,10 +229,10 @@ func TestDeleteRouteShouldRemoveExistingRoute(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, rw.Result().StatusCode)
 }
 
-func TestNewWebServerOnBoundAddressShouldFail(t *testing.T) {
-	_, err := NewWebServer(logging.NewLogrusLogger(logrus.New()), ":1234")
-	assert.Nil(t, err)
+func TestNewWebServerOnBoundAddressShouldLogError(t *testing.T) {
+	NewWebServer(logging.NewLogrusLogger(logrus.New()), ":1234")
 
-	_, err = NewWebServer(logging.NewLogrusLogger(logrus.New()), ":1234")
-	assert.NotNil(t, err)
+	time.Sleep(50 * time.Millisecond)
+
+	NewWebServer(logging.NewLogrusLogger(logrus.New()), ":1234")
 }
