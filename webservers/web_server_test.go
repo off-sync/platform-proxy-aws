@@ -232,7 +232,7 @@ func TestDeleteRouteShouldRemoveExistingRoute(t *testing.T) {
 func TestNewWebServerOnBoundAddressShouldLogError(t *testing.T) {
 	NewWebServer(logging.NewLogrusLogger(logrus.New()), ":1234")
 
-	time.Sleep(50 * time.Millisecond)
-
 	NewWebServer(logging.NewLogrusLogger(logrus.New()), ":1234")
+
+	time.Sleep(10 * time.Millisecond)
 }

@@ -105,3 +105,16 @@ func (m *routeManager) DeleteRoute(route *url.URL) {
 
 	m.reconfigureRoutes()
 }
+
+// ServeHTTP process requests using the configured router.
+func (m *routeManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	m.log.WithField("host", r.Host).
+		WithField("url", r.URL).
+		Debug("serving HTTP")
+
+	m.routerLock.RLock()
+	router := m.router
+	m.routerLock.RUnlock()
+
+	router.ServeHTTP(w, r)
+}

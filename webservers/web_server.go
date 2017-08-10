@@ -24,34 +24,21 @@ type WebServer struct {
 func NewWebServer(log interfaces.Logger, addr string) *WebServer {
 	m := newRouteManager(log)
 
-	webServer := &WebServer{
+	s := &WebServer{
 		routeManager: m,
 		server: &http.Server{
 			Addr: addr,
 		},
 	}
 
-	webServer.server.Handler = webServer
+	s.server.Handler = s
 
 	// start the http server
 	go func() {
-		if err := webServer.server.ListenAndServe(); err != nil {
+		if err := s.server.ListenAndServe(); err != nil {
 			log.WithError(err).Error("listening and serving")
 		}
 	}()
 
-	return webServer
-}
-
-// ServeHTTP process requests using the configured router.
-func (s *WebServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.log.WithField("host", r.Host).
-		WithField("url", r.URL).
-		Debug("serving HTTP")
-
-	s.routerLock.RLock()
-	router := s.router
-	s.routerLock.RUnlock()
-
-	router.ServeHTTP(w, r)
+	return s
 }
