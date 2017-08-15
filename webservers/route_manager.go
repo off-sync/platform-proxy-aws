@@ -64,9 +64,9 @@ func (m *routeManager) reconfigureRoutes() {
 
 	// update the router
 	m.routerLock.Lock()
+	defer m.routerLock.Unlock()
 	m.router = router
 	m.routerHash = hash
-	m.routerLock.Unlock()
 
 	return
 }

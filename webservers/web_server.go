@@ -22,10 +22,8 @@ type WebServer struct {
 
 // NewWebServer creates a new Web Server listening on the provided address.
 func NewWebServer(log interfaces.Logger, addr string) *WebServer {
-	m := newRouteManager(log)
-
 	s := &WebServer{
-		routeManager: m,
+		routeManager: newRouteManager(log),
 		server: &http.Server{
 			Addr: addr,
 		},
