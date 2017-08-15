@@ -22,6 +22,9 @@ package cmd
 
 import (
 	"context"
+	"os"
+	"os/signal"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -150,8 +153,11 @@ func run(cmd *cobra.Command, args []string) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
+	wg := &sync.WaitGroup{}
+
 	err = startProxyCmd.Execute(&startproxy.Model{
 		Ctx:             ctx,
+		WaitGroup:       wg,
 		PollingDuration: time.Duration(viper.GetInt(KeyPollingDuration)) * time.Second,
 		LoadBalancer:    &loadbalancers.LoadBalancer{},
 		SecureWebServer: webservers.NewSecureWebServer(logging.NewLogrusLogger(logger), viper.GetString(KeySecureAddr)),
@@ -161,7 +167,19 @@ func run(cmd *cobra.Command, args []string) {
 		logger.WithError(err).Fatal("executing start proxy command")
 	}
 
-	time.Sleep(60 * time.Second)
+	// wait for SIGINT
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	<-c
 
+	logger.Info("received SIGINT: stopping")
+
+	// cancel the context to trigger the cleanup process
 	cancel()
+
+	// wait for any processes that were started by the start proxy command
+	// to cleanup
+	wg.Wait()
+
+	logger.Info("stopped")
 }
