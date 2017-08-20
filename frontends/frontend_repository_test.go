@@ -20,7 +20,7 @@ const tableName = "frontends"
 func setUpSqsWatcher(t *testing.T) (*common.SqsWatcher, *interfaces.AwsSqsAPIMock) {
 	api := interfaces.NewAwsSqsAPIMock()
 
-	sw, err := common.NewSqsWatcher(context.Background(), api)
+	sw, err := common.NewSqsWatcher(context.Background(), api, "name")
 	assert.Nil(t, err)
 
 	return sw, api

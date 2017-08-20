@@ -47,18 +47,27 @@ var runCmd = &cobra.Command{
 	Run:   run,
 }
 
-// Flags, configuration keys and defaults.
 const (
+	// KeyPrefix for configuration keys.
 	KeyPrefix = "run."
+)
 
+// Polling Duration flags, configuration keys and defaults.
+const (
 	FlagPollingDuration    = "polling-duration"
 	KeyPollingDuration     = KeyPrefix + "pollingDuration"
 	DefaultPollingDuration = 300
+)
 
+// Address flags, configuration keys and defaults.
+const (
 	FlagAddr    = "addr"
 	KeyAddr     = KeyPrefix + "addr"
 	DefaultAddr = ":80"
+)
 
+// Secure Address flags, configuration keys and defaults.
+const (
 	FlagSecureAddr    = "secure-addr"
 	KeySecureAddr     = KeyPrefix + "secureAddr"
 	DefaultSecureAddr = ":443"
@@ -101,6 +110,15 @@ func run(cmd *cobra.Command, args []string) {
 		logger.
 			WithError(err).
 			Fatal("creating AWS DynamoDB API")
+
+		return
+	}
+
+	sqsAPI, err := infra.NewAwsSqsSdkFromConfig()
+	if err != nil {
+		logger.
+			WithError(err).
+			Fatal("creating AWS SQS API")
 
 		return
 	}

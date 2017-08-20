@@ -9,7 +9,8 @@ import (
 
 // Errors.
 var (
-	ErrAwsSqsAPIMissing = errors.New("AWS SQS API missing")
+	ErrAwsSqsAPIMissing       = errors.New("AWS SQS API missing")
+	ErrAwsSqsQueueNameMissing = errors.New("AWS SQS Queue Name missing")
 )
 
 // SqsWatcher uses the provided AWS SQS API to listen for messages and forwards
@@ -17,13 +18,16 @@ var (
 type SqsWatcher struct {
 	*SubscriptionManager
 
-	api interfaces.AwsSqsAPI
+	api      interfaces.AwsSqsAPI
+	queueURL string
 }
 
 // NewSqsWatcher creates a new SQS Watcher using the provided context for
 // cancellation, and API to query the AWS SQS.
 func NewSqsWatcher(
-	ctx context.Context, api interfaces.AwsSqsAPI) (*SqsWatcher, error) {
+	ctx context.Context,
+	api interfaces.AwsSqsAPI,
+	queueName string) (*SqsWatcher, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -32,9 +36,19 @@ func NewSqsWatcher(
 		return nil, ErrAwsSqsAPIMissing
 	}
 
+	if queueName == "" {
+		return nil, ErrAwsSqsQueueNameMissing
+	}
+
+	queueURL, err := api.GetQueueURL(queueName)
+	if err != nil {
+		return nil, err
+	}
+
 	sw := &SqsWatcher{
 		SubscriptionManager: NewSubscriptionManager(ctx),
 		api:                 api,
+		queueURL:            queueURL,
 	}
 
 	// start message polling
@@ -44,7 +58,7 @@ func NewSqsWatcher(
 			case <-ctx.Done():
 				return
 			default:
-				if msgs, err := sw.api.ReceiveMessageWithContext(ctx); err == nil {
+				if msgs, err := sw.api.ReceiveMessageWithContext(ctx, sw.queueURL); err == nil {
 					for _, msg := range msgs {
 						sw.Publish(msg)
 					}

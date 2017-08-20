@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/sqs"
 )
 
@@ -12,6 +13,7 @@ import (
 // in public members of the struct.
 type AwsSqsAPIMock struct {
 	// Flags that determine whether an error will always be returned.
+	FailGetQueueURL               bool
 	FailReceiveMessageWithContext bool
 	FailDeleteMessage             bool
 
@@ -26,19 +28,30 @@ func NewAwsSqsAPIMock() *AwsSqsAPIMock {
 	}
 }
 
+//GetQueueURL returns the URL for the queue with the provided name.
+func (m *AwsSqsAPIMock) GetQueueURL(queueName string) (string, error) {
+	if m.FailGetQueueURL {
+		return "", fmt.Errorf("GetQueueURL(%s): fail", queueName)
+	}
+
+	return queueName, nil
+}
+
 // ReceiveMessageWithContext returns the available message on the queue. It
 // accepts a Context as its first parameter to allow cancellation of the
 // request.
 //
 // It must return an empty slice if no messages could be received before the
 // context was cancelled.
-func (m *AwsSqsAPIMock) ReceiveMessageWithContext(ctx context.Context) ([]*sqs.Message, error) {
+func (m *AwsSqsAPIMock) ReceiveMessageWithContext(ctx context.Context, queueURL string) ([]*sqs.Message, error) {
 	if m.FailReceiveMessageWithContext {
-		return nil, fmt.Errorf("ReceiveMessageWithContext(%v): fail", ctx)
+		return nil, fmt.Errorf("ReceiveMessageWithContext(%v, %s): fail", ctx, queueURL)
 	}
 
 	var msgs []*sqs.Message
-	for _, msg := range m.Messages {
+	for receiptHandle, msg := range m.Messages {
+		msg.ReceiptHandle = aws.String(receiptHandle)
+
 		msgs = append(msgs, msg)
 	}
 
