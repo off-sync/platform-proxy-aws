@@ -4,8 +4,6 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/spf13/viper"
 )
@@ -90,10 +88,7 @@ func (s *AwsEcsSdk) DescribeTaskDefinition(taskDefArn string) (*ecs.TaskDefiniti
 // exposed via viper. The AWS ID, secret, region and cluster name are retrieved
 // from the configuration.
 func NewAwsEcsSdkFromConfig() (*AwsEcsSdk, error) {
-	sess, err := session.NewSession(&aws.Config{
-		Credentials: credentials.NewStaticCredentials(viper.GetString(awsID), viper.GetString(awsSecret), ""),
-		Region:      aws.String(viper.GetString(awsRegion)),
-	})
+	sess, err := getSession()
 	if err != nil {
 		return nil, err
 	}

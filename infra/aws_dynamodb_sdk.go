@@ -2,10 +2,7 @@ package infra
 
 import (
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/spf13/viper"
 )
 
 // AwsDynamoDBSdk implements the AWS DynamoDB API.
@@ -24,10 +21,7 @@ func NewAwsDynamoDBSdk(dynSvc *dynamodb.DynamoDB) *AwsDynamoDBSdk {
 // exposed via viper. The AWS ID, secret, region are retrieved from the
 // configuration.
 func NewAwsDynamoDBSdkFromConfig() (*AwsDynamoDBSdk, error) {
-	sess, err := session.NewSession(&aws.Config{
-		Credentials: credentials.NewStaticCredentials(viper.GetString(awsID), viper.GetString(awsSecret), ""),
-		Region:      aws.String(viper.GetString(awsRegion)),
-	})
+	sess, err := getSession()
 	if err != nil {
 		return nil, err
 	}

@@ -64,6 +64,18 @@ func NewAwsSqsSdk(sqsSvc *sqs.SQS, queueName string, options ...AwsSqsSdkOption)
 	return s, nil
 }
 
+// NewAwsSqsSdkFromConfig creates a new AWS SQS SDK from configuration.
+func NewAwsSqsSdkFromConfig(queueName string) (*AwsSqsSdk, error) {
+	sess, err := getSession()
+	if err != nil {
+		return nil, err
+	}
+
+	sqsSvc := sqs.New(sess)
+
+	return NewAwsSqsSdk(sqsSvc, queueName)
+}
+
 // WithWaitTime configures the AwsSqsSdk with the provided wait time in seconds.
 func WithWaitTime(seconds int) AwsSqsSdkOption {
 	return func(s *AwsSqsSdk) error {
