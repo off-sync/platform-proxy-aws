@@ -1,10 +1,15 @@
 package frontends
 
 import (
+	"encoding/json"
+	"errors"
 	"net/url"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go/service/sqs"
 	appInterfaces "github.com/off-sync/platform-proxy-app/interfaces"
+	"github.com/off-sync/platform-proxy-aws/common"
 	"github.com/off-sync/platform-proxy-aws/interfaces"
 	"github.com/off-sync/platform-proxy-domain/frontends"
 )
@@ -14,24 +19,43 @@ const (
 	AttributeNameFrontendName = "Name"
 )
 
+// Errors.
+var (
+	ErrAwsDynamoDBAPIMissing = errors.New("AWS DynamoDB API missing")
+	ErrAwsSQSWatcherMissing  = errors.New("AWS SQS Watcher missing")
+)
+
 // FrontendRepository implements the FrontendRepository interface backed by an
 // AWS DynamoDB table.
 type FrontendRepository struct {
 	api       interfaces.AwsDynamoDBAPI
 	tableName string
+
+	sqsWatcher *common.SqsWatcher
 }
 
 // NewFrontendRepository creates a new FrontendRepository using the provided AWS DyanamoDB
 // API and table name.
-func NewFrontendRepository(api interfaces.AwsDynamoDBAPI, tableName string) (*FrontendRepository, error) {
+func NewFrontendRepository(
+	api interfaces.AwsDynamoDBAPI, tableName string,
+	sqsWatcher *common.SqsWatcher) (*FrontendRepository, error) {
+	if api == nil {
+		return nil, ErrAwsDynamoDBAPIMissing
+	}
+
 	_, err := api.DescribeTable(tableName)
 	if err != nil {
 		return nil, err
 	}
 
+	if sqsWatcher == nil {
+		return nil, ErrAwsSQSWatcherMissing
+	}
+
 	return &FrontendRepository{
-		api:       api,
-		tableName: tableName,
+		api:        api,
+		tableName:  tableName,
+		sqsWatcher: sqsWatcher,
 	}, nil
 }
 
@@ -112,4 +136,40 @@ func (r *FrontendRepository) DescribeFrontend(name string) (*frontends.Frontend,
 		ServiceName: f.ServiceName,
 		Certificate: cert,
 	}, nil
+}
+
+// Subscribe returns a channel through which frontend events will
+// be distributed.
+func (r *FrontendRepository) Subscribe() <-chan appInterfaces.FrontendEvent {
+	feChan := make(chan appInterfaces.FrontendEvent)
+
+	go func() {
+		sub := r.sqsWatcher.Subscribe()
+
+		for {
+			select {
+			case e := <-sub:
+				if sqsMsg, ok := e.(*sqs.Message); ok {
+					sendFrontendEvent(feChan, sqsMsg)
+				}
+			}
+		}
+	}()
+
+	return feChan
+}
+
+type frontendEventBody struct {
+	Message struct {
+		Frontends []string `json:"Frontends"`
+	} `json:"Message"`
+}
+
+func sendFrontendEvent(feChan chan<- appInterfaces.FrontendEvent, sqsMsg *sqs.Message) {
+	msg := &frontendEventBody{}
+	if err := json.Unmarshal([]byte(aws.StringValue(sqsMsg.Body)), msg); err == nil {
+		for _, name := range msg.Message.Frontends {
+			feChan <- appInterfaces.FrontendEvent{Name: name}
+		}
+	}
 }

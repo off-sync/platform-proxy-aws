@@ -1,10 +1,15 @@
 package frontends
 
 import (
+	"context"
 	"net/url"
 	"testing"
+	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/off-sync/platform-proxy-aws/common"
 	"github.com/off-sync/platform-proxy-aws/interfaces"
 	"github.com/off-sync/platform-proxy-domain/frontends"
 	"github.com/stretchr/testify/assert"
@@ -12,7 +17,16 @@ import (
 
 const tableName = "frontends"
 
-func setUp(t *testing.T) (*FrontendRepository, *interfaces.AwsDynamoDBAPIMock) {
+func setUpSqsWatcher(t *testing.T) (*common.SqsWatcher, *interfaces.AwsSqsAPIMock) {
+	api := interfaces.NewAwsSqsAPIMock()
+
+	sw, err := common.NewSqsWatcher(context.Background(), api)
+	assert.Nil(t, err)
+
+	return sw, api
+}
+
+func setUp(t *testing.T) (*FrontendRepository, *interfaces.AwsDynamoDBAPIMock, *interfaces.AwsSqsAPIMock) {
 	api := interfaces.NewAwsDynamoDBAPIMock()
 
 	item1, err := dynamodbattribute.MarshalMap(map[string]interface{}{
@@ -57,29 +71,47 @@ func setUp(t *testing.T) (*FrontendRepository, *interfaces.AwsDynamoDBAPIMock) {
 
 	api.SetTable(tableName, item1, item2, item3, item4, item5, item6)
 
-	r, err := NewFrontendRepository(api, tableName)
+	sqsWatcher, sqsAPI := setUpSqsWatcher(t)
+
+	r, err := NewFrontendRepository(api, tableName, sqsWatcher)
 	assert.Nil(t, err)
 
 	assert.NotNil(t, r)
 
-	return r, api
+	return r, api, sqsAPI
 }
 
 func TestNewFrontendRepository(t *testing.T) {
-	r, _ := setUp(t)
+	r, _, _ := setUp(t)
 	assert.NotNil(t, r)
+}
+
+func TestNewFrontendRepositoryShouldReturnErrorOnMissingAPI(t *testing.T) {
+	sw, _ := setUpSqsWatcher(t)
+
+	_, err := NewFrontendRepository(nil, "", sw)
+	assert.Equal(t, ErrAwsDynamoDBAPIMissing, err)
 }
 
 func TestNewFrontendRepositoryShouldReturnErrorForNonExistingTable(t *testing.T) {
 	api := interfaces.NewAwsDynamoDBAPIMock()
+	sw, _ := setUpSqsWatcher(t)
 
-	r, err := NewFrontendRepository(api, tableName)
+	r, err := NewFrontendRepository(api, tableName, sw)
 	assert.NotNil(t, err)
 	assert.Nil(t, r)
 }
 
+func TestNewFrontendRepositoryShouldReturnErrorOnMissingSqsAPI(t *testing.T) {
+	api := interfaces.NewAwsDynamoDBAPIMock()
+	api.SetTable(tableName)
+
+	_, err := NewFrontendRepository(api, tableName, nil)
+	assert.Equal(t, ErrAwsSQSWatcherMissing, err)
+}
+
 func TestFrontendRepositoryListFrontends(t *testing.T) {
-	r, _ := setUp(t)
+	r, _, _ := setUp(t)
 
 	names, err := r.ListFrontends()
 	assert.Nil(t, err)
@@ -88,7 +120,7 @@ func TestFrontendRepositoryListFrontends(t *testing.T) {
 }
 
 func TestFrontendRepositoryListFrontendsReturnsErrorWhenScanAllItemsFails(t *testing.T) {
-	r, api := setUp(t)
+	r, api, _ := setUp(t)
 
 	api.FailScanAllItems = true
 
@@ -97,7 +129,7 @@ func TestFrontendRepositoryListFrontendsReturnsErrorWhenScanAllItemsFails(t *tes
 }
 
 func TestFrontendRepositoryDescribeFrontend(t *testing.T) {
-	r, _ := setUp(t)
+	r, _, _ := setUp(t)
 
 	f, err := r.DescribeFrontend("frontend1")
 	assert.Nil(t, err)
@@ -117,7 +149,7 @@ func TestFrontendRepositoryDescribeFrontend(t *testing.T) {
 }
 
 func TestFrontendRepositoryDescribeFrontendWithoutCertificate(t *testing.T) {
-	r, _ := setUp(t)
+	r, _, _ := setUp(t)
 
 	f, err := r.DescribeFrontend("frontend6")
 	assert.Nil(t, err)
@@ -133,14 +165,14 @@ func TestFrontendRepositoryDescribeFrontendWithoutCertificate(t *testing.T) {
 }
 
 func TestFrontendRepositoryDescribeFrontendReturnsErrorForNonExistingFrontend(t *testing.T) {
-	r, _ := setUp(t)
+	r, _, _ := setUp(t)
 
 	_, err := r.DescribeFrontend("unknown")
 	assert.NotNil(t, err)
 }
 
 func TestFrontendRepositoryDescribeFrontendReturnsErrorWhenGetItemFails(t *testing.T) {
-	r, api := setUp(t)
+	r, api, _ := setUp(t)
 
 	api.FailGetItem = true
 
@@ -149,17 +181,32 @@ func TestFrontendRepositoryDescribeFrontendReturnsErrorWhenGetItemFails(t *testi
 }
 
 func TestFrontendRepositoryDescribeFrontendReturnsErrorWhenURLIsInvalid(t *testing.T) {
-	r, _ := setUp(t)
+	r, _, _ := setUp(t)
 
 	_, err := r.DescribeFrontend("frontend2")
 	assert.NotNil(t, err)
 }
 
 func TestFrontendRepositoryDescribeFrontendReturnsErrorWhenCertificateIsInvalid(t *testing.T) {
-	r, _ := setUp(t)
+	r, _, _ := setUp(t)
 
 	_, err := r.DescribeFrontend("frontend3")
 	assert.NotNil(t, err)
+}
+
+func TestFrontendRepositorySubscribe(t *testing.T) {
+	r, _, sqsAPI := setUp(t)
+	sqsAPI.Messages["msg1"] = &sqs.Message{Body: aws.String(`{"Message":{"Frontends":["test1"]}}`)}
+
+	sub := r.Subscribe()
+
+	select {
+	case fe := <-sub:
+		assert.Equal(t, "test1", fe.Name)
+	case <-time.After(1000 * time.Millisecond):
+		t.Fail()
+		return
+	}
 }
 
 // Not After: Jul 20 10:49:01 2027 GMT
