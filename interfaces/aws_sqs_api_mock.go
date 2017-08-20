@@ -60,7 +60,7 @@ func (m *AwsSqsAPIMock) ReceiveMessageWithContext(ctx context.Context, queueURL 
 
 // DeleteMessage removes the message associated with the provided receipt
 // handle.
-func (m *AwsSqsAPIMock) DeleteMessage(receiptHandle string) error {
+func (m *AwsSqsAPIMock) DeleteMessage(queueURL, receiptHandle string) error {
 	if m.FailDeleteMessage {
 		return fmt.Errorf("DeleteMessage(%s): fail", receiptHandle)
 	}

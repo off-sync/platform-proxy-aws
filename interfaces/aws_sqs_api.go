@@ -21,5 +21,5 @@ type AwsSqsAPI interface {
 
 	// DeleteMessage removes the message associated with the provided receipt
 	// handle.
-	DeleteMessage(receiptHandle string) error
+	DeleteMessage(queueURL, receiptHandle string) error
 }

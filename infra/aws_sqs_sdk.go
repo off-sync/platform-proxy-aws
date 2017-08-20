@@ -21,8 +21,7 @@ const (
 
 // AwsSqsSdk implements the AWS SQS API.
 type AwsSqsSdk struct {
-	sqsSvc   *sqs.SQS
-	queueURL *string
+	sqsSvc *sqs.SQS
 
 	// configuration
 	waitTime          int
@@ -34,28 +33,14 @@ type AwsSqsSdk struct {
 type AwsSqsSdkOption func(*AwsSqsSdk) error
 
 // NewAwsSqsSdk creates a new AwsSqsSdk.
-func NewAwsSqsSdk(sqsSvc *sqs.SQS, queueName string, options ...AwsSqsSdkOption) (*AwsSqsSdk, error) {
-	lqo, err := sqsSvc.ListQueues(&sqs.ListQueuesInput{
-		QueueNamePrefix: aws.String(queueName),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if len(lqo.QueueUrls) < 1 {
-		return nil, ErrQueueNotFound
-	} else if len(lqo.QueueUrls) > 1 {
-		return nil, ErrMultipleQueuesFound
-	}
-
+func NewAwsSqsSdk(sqsSvc *sqs.SQS, options ...AwsSqsSdkOption) (*AwsSqsSdk, error) {
 	s := &AwsSqsSdk{
 		sqsSvc:   sqsSvc,
-		queueURL: lqo.QueueUrls[0],
 		waitTime: DefaultWaitTime,
 	}
 
 	for _, opt := range options {
-		err = opt(s)
+		err := opt(s)
 		if err != nil {
 			return nil, err
 		}
@@ -73,7 +58,7 @@ func NewAwsSqsSdkFromConfig(queueName string) (*AwsSqsSdk, error) {
 
 	sqsSvc := sqs.New(sess)
 
-	return NewAwsSqsSdk(sqsSvc, queueName)
+	return NewAwsSqsSdk(sqsSvc)
 }
 
 // WithWaitTime configures the AwsSqsSdk with the provided wait time in seconds.
@@ -91,15 +76,33 @@ func WithWaitTime(seconds int) AwsSqsSdkOption {
 	}
 }
 
+//GetQueueURL returns the URL for the queue with the provided name.
+func (s *AwsSqsSdk) GetQueueURL(queueName string) (string, error) {
+	lqo, err := s.sqsSvc.ListQueues(&sqs.ListQueuesInput{
+		QueueNamePrefix: aws.String(queueName),
+	})
+	if err != nil {
+		return "", err
+	}
+
+	if len(lqo.QueueUrls) < 1 {
+		return "", ErrQueueNotFound
+	} else if len(lqo.QueueUrls) > 1 {
+		return "", ErrMultipleQueuesFound
+	}
+
+	return aws.StringValue(lqo.QueueUrls[0]), nil
+}
+
 // ReceiveMessageWithContext returns the available messages on the queue. It
 // accepts a Context as its first parameter to allow cancellation of the
 // request.
 //
 // It must return an empty slice if no messages could be received before the
 // context was cancelled.
-func (s *AwsSqsSdk) ReceiveMessageWithContext(ctx context.Context) ([]*sqs.Message, error) {
+func (s *AwsSqsSdk) ReceiveMessageWithContext(ctx context.Context, queueURL string) ([]*sqs.Message, error) {
 	rmo, err := s.sqsSvc.ReceiveMessageWithContext(ctx, &sqs.ReceiveMessageInput{
-		QueueUrl:          s.queueURL,
+		QueueUrl:          aws.String(queueURL),
 		VisibilityTimeout: aws.Int64(int64(s.visibilityTimeout)),
 		WaitTimeSeconds:   aws.Int64(int64(s.waitTime)),
 	})
@@ -111,9 +114,9 @@ func (s *AwsSqsSdk) ReceiveMessageWithContext(ctx context.Context) ([]*sqs.Messa
 }
 
 // DeleteMessage removes a message from the provided queue.
-func (s *AwsSqsSdk) DeleteMessage(receiptHandle string) error {
+func (s *AwsSqsSdk) DeleteMessage(queueURL, receiptHandle string) error {
 	_, err := s.sqsSvc.DeleteMessage(&sqs.DeleteMessageInput{
-		QueueUrl:      s.queueURL,
+		QueueUrl:      aws.String(queueURL),
 		ReceiptHandle: aws.String(receiptHandle),
 	})
 

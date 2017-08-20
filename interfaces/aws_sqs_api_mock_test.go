@@ -80,14 +80,14 @@ func TestFailDeleteMessage(t *testing.T) {
 	m := setUpAwsSqsAPIMock(t)
 	m.FailDeleteMessage = true
 
-	err := m.DeleteMessage("")
+	err := m.DeleteMessage("url", "")
 	assert.NotNil(t, err)
 }
 
 func TestDeleteMessageShouldFailOnUnknownReceiptHandle(t *testing.T) {
 	m := setUpAwsSqsAPIMock(t)
 
-	err := m.DeleteMessage("test")
+	err := m.DeleteMessage("url", "test")
 	assert.NotNil(t, err)
 }
 
@@ -95,6 +95,6 @@ func TestDeleteMessage(t *testing.T) {
 	m := setUpAwsSqsAPIMock(t)
 	m.Messages["test"] = &sqs.Message{}
 
-	err := m.DeleteMessage("test")
+	err := m.DeleteMessage("url", "test")
 	assert.Nil(t, err)
 }
