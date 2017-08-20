@@ -1,27 +1,48 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ecs"
+	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/off-sync/platform-proxy-aws/common"
 	"github.com/off-sync/platform-proxy-aws/interfaces"
 	"github.com/off-sync/platform-proxy-domain/services"
 )
 
-func setUp(t *testing.T, options ...ServiceRepositoryOption) (*ServiceRepository, *interfaces.AwsEcsAPIMock) {
+func setUpSqsWatcher(t *testing.T) (*common.SqsWatcher, *interfaces.AwsSqsAPIMock) {
+	api := interfaces.NewAwsSqsAPIMock()
+
+	sw, err := common.NewSqsWatcher(context.Background(), api)
+	assert.Nil(t, err)
+
+	return sw, api
+}
+
+func setUp(t *testing.T, options ...ServiceRepositoryOption) (
+	*ServiceRepository,
+	*interfaces.AwsEcsAPIMock,
+	*interfaces.AwsSqsAPIMock) {
 	api := interfaces.NewAwsEcsAPIMock()
 
-	serviceRepository, err := NewServiceRepository(api, options...)
+	sw, sqsAPI := setUpSqsWatcher(t)
+
+	serviceRepository, err := NewServiceRepository(
+		api,
+		sw,
+		options...)
 
 	assert.Nil(t, err)
 	assert.NotNil(t, serviceRepository)
 
-	return serviceRepository, api
+	return serviceRepository, api, sqsAPI
 }
 
 func TestNewServiceRepository(t *testing.T) {
@@ -35,12 +56,30 @@ func TestNewServiceRepositoryWithOptions(t *testing.T) {
 		WithDefaultPort(1234))
 }
 
+func TestNewServiceRepositoryWithMissingAPI(t *testing.T) {
+	sw, _ := setUpSqsWatcher(t)
+
+	serviceRepository, err := NewServiceRepository(nil, sw)
+	assert.Nil(t, serviceRepository)
+	assert.Equal(t, ErrMissingAwsEcsAPI, err)
+}
+
+func TestNewServiceRepositoryWithMissingSqsWatcher(t *testing.T) {
+	api := interfaces.NewAwsEcsAPIMock()
+
+	serviceRepository, err := NewServiceRepository(api, nil)
+	assert.Nil(t, serviceRepository)
+	assert.Equal(t, ErrMissingSqsWatcher, err)
+}
+
 func TestNewServiceRepositoryWithFailingOption(t *testing.T) {
 	optErr := errors.New("option error")
 
 	api := interfaces.NewAwsEcsAPIMock()
 
-	serviceRepository, err := NewServiceRepository(api, func(*ServiceRepository) error {
+	sw, _ := setUpSqsWatcher(t)
+
+	serviceRepository, err := NewServiceRepository(api, sw, func(*ServiceRepository) error {
 		return optErr
 	})
 	assert.Nil(t, serviceRepository)
@@ -49,7 +88,7 @@ func TestNewServiceRepositoryWithFailingOption(t *testing.T) {
 }
 
 func TestListServices(t *testing.T) {
-	r, api := setUp(t)
+	r, api, _ := setUp(t)
 
 	api.ServiceNames = []string{"service1", "service2"}
 
@@ -60,7 +99,7 @@ func TestListServices(t *testing.T) {
 }
 
 func TestDescribeService(t *testing.T) {
-	r, api := setUp(t)
+	r, api, _ := setUp(t)
 
 	api.Services["service1"] = &ecs.Service{
 		TaskDefinition: aws.String("taskDef1"),
@@ -94,13 +133,13 @@ func TestDescribeService(t *testing.T) {
 }
 
 func TestDescribeServiceShouldReturnErrorWhenAPIFails(t *testing.T) {
-	r, api := setUp(t)
+	r, api, _ := setUp(t)
 	api.FailDescribeService = true
 
 	_, err := r.DescribeService("service1")
 	assert.NotNil(t, err)
 
-	r, api = setUp(t)
+	r, api, _ = setUp(t)
 	api.Services["service1"] = &ecs.Service{TaskDefinition: aws.String("taskDef1")}
 	api.FailDescribeTaskDefinition = true
 
@@ -109,7 +148,7 @@ func TestDescribeServiceShouldReturnErrorWhenAPIFails(t *testing.T) {
 }
 
 func TestDescribeServiceShouldReturnErrorWhenServerContainerNotFound(t *testing.T) {
-	r, api := setUp(t)
+	r, api, _ := setUp(t)
 	api.Services["service1"] = &ecs.Service{TaskDefinition: aws.String("taskDef1")}
 	api.TaskDefs["taskDef1"] = &ecs.TaskDefinition{}
 
@@ -118,7 +157,7 @@ func TestDescribeServiceShouldReturnErrorWhenServerContainerNotFound(t *testing.
 }
 
 func TestDescribeServiceShouldReturnErrorOnInvalidPort(t *testing.T) {
-	r, api := setUp(t)
+	r, api, _ := setUp(t)
 
 	api.Services["service1"] = &ecs.Service{
 		TaskDefinition: aws.String("taskDef1"),
@@ -138,4 +177,18 @@ func TestDescribeServiceShouldReturnErrorOnInvalidPort(t *testing.T) {
 
 	_, err := r.DescribeService("service1")
 	assert.NotNil(t, err)
+}
+
+func TestSubscribe(t *testing.T) {
+	r, _, sqsAPI := setUp(t)
+	sqsAPI.Messages["msg1"] = &sqs.Message{Body: aws.String(`{"Message":{"Services":["test1"]}}`)}
+
+	sub := r.Subscribe()
+
+	select {
+	case se := <-sub:
+		assert.Equal(t, "test1", se.Name)
+	case <-time.After(1000 * time.Millisecond):
+		t.Fail()
+	}
 }

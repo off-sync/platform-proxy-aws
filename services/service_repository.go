@@ -21,11 +21,16 @@
 package services
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/sqs"
 
+	appInterfaces "github.com/off-sync/platform-proxy-app/interfaces"
+	"github.com/off-sync/platform-proxy-aws/common"
 	"github.com/off-sync/platform-proxy-aws/interfaces"
 	"github.com/off-sync/platform-proxy-domain/services"
 )
@@ -40,7 +45,15 @@ type ServiceRepository struct {
 	serverContainerName string
 	dockerLabelPort     string
 	defaultPort         int
+
+	sqsWatcher *common.SqsWatcher
 }
+
+// Errors.
+var (
+	ErrMissingAwsEcsAPI  = errors.New("missing AWS ECS API")
+	ErrMissingSqsWatcher = errors.New("missing SQS Watcher")
+)
 
 // Default values for the ServiceRepository struct.
 const (
@@ -55,9 +68,21 @@ type ServiceRepositoryOption func(*ServiceRepository) error
 
 // NewServiceRepository creates a new service repository based on the provided
 // AWS ECS API.
-func NewServiceRepository(api interfaces.AwsEcsAPI, options ...ServiceRepositoryOption) (*ServiceRepository, error) {
+func NewServiceRepository(
+	api interfaces.AwsEcsAPI,
+	sqsWatcher *common.SqsWatcher,
+	options ...ServiceRepositoryOption) (*ServiceRepository, error) {
+	if api == nil {
+		return nil, ErrMissingAwsEcsAPI
+	}
+
+	if sqsWatcher == nil {
+		return nil, ErrMissingSqsWatcher
+	}
+
 	r := &ServiceRepository{
 		api:                 api,
+		sqsWatcher:          sqsWatcher,
 		serverContainerName: DefaultServerContainerName,
 		dockerLabelPort:     DefaultDockerLabelPort,
 		defaultPort:         DefaultDefaultPort,
@@ -147,4 +172,40 @@ func (r *ServiceRepository) getTaskDefinitionServerURL(taskDefArn string) (strin
 	}
 
 	return "", fmt.Errorf("no server container found for task definition: %s", taskDefArn)
+}
+
+// Subscribe returns a channel through which frontend events will
+// be distributed.
+func (r *ServiceRepository) Subscribe() <-chan appInterfaces.ServiceEvent {
+	svcChan := make(chan appInterfaces.ServiceEvent)
+
+	go func() {
+		sub := r.sqsWatcher.Subscribe()
+
+		for {
+			select {
+			case e := <-sub:
+				if sqsMsg, ok := e.(*sqs.Message); ok {
+					sendServiceEvent(svcChan, sqsMsg)
+				}
+			}
+		}
+	}()
+
+	return svcChan
+}
+
+type serviceEventBody struct {
+	Message struct {
+		Services []string `json:"Services"`
+	} `json:"Message"`
+}
+
+func sendServiceEvent(svcChan chan<- appInterfaces.ServiceEvent, sqsMsg *sqs.Message) {
+	msg := &serviceEventBody{}
+	if err := json.Unmarshal([]byte(aws.StringValue(sqsMsg.Body)), msg); err == nil {
+		for _, name := range msg.Message.Services {
+			svcChan <- appInterfaces.ServiceEvent{Name: name}
+		}
+	}
 }
