@@ -196,7 +196,7 @@ func TestFrontendRepositoryDescribeFrontendReturnsErrorWhenCertificateIsInvalid(
 
 func TestFrontendRepositorySubscribe(t *testing.T) {
 	r, _, sqsAPI := setUp(t)
-	sqsAPI.Messages["msg1"] = &sqs.Message{Body: aws.String(`{"Message":{"Frontends":["test1"]}}`)}
+	sqsAPI.Messages["msg1"] = &sqs.Message{Body: aws.String(`{"Message":"{\"Frontends\":[\"test1\"]}"}`)}
 
 	sub := r.Subscribe()
 
@@ -205,7 +205,6 @@ func TestFrontendRepositorySubscribe(t *testing.T) {
 		assert.Equal(t, "test1", fe.Name)
 	case <-time.After(1000 * time.Millisecond):
 		t.Fail()
-		return
 	}
 }
 

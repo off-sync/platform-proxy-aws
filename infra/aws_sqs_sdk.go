@@ -50,7 +50,7 @@ func NewAwsSqsSdk(sqsSvc *sqs.SQS, options ...AwsSqsSdkOption) (*AwsSqsSdk, erro
 }
 
 // NewAwsSqsSdkFromConfig creates a new AWS SQS SDK from configuration.
-func NewAwsSqsSdkFromConfig(queueName string) (*AwsSqsSdk, error) {
+func NewAwsSqsSdkFromConfig() (*AwsSqsSdk, error) {
 	sess, err := getSession()
 	if err != nil {
 		return nil, err

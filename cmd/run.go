@@ -32,6 +32,7 @@ import (
 
 	"github.com/off-sync/platform-proxy-app/infra/logging"
 	"github.com/off-sync/platform-proxy-app/proxies/cmd/startproxy"
+	"github.com/off-sync/platform-proxy-aws/common"
 	"github.com/off-sync/platform-proxy-aws/frontends"
 	"github.com/off-sync/platform-proxy-aws/infra"
 	"github.com/off-sync/platform-proxy-aws/loadbalancers"
@@ -52,25 +53,37 @@ const (
 	KeyPrefix = "run."
 )
 
-// Polling Duration flags, configuration keys and defaults.
+// Polling Duration flag, configuration key and default.
 const (
 	FlagPollingDuration    = "polling-duration"
 	KeyPollingDuration     = KeyPrefix + "pollingDuration"
 	DefaultPollingDuration = 300
 )
 
-// Address flags, configuration keys and defaults.
+// Address flag, configuration key and default.
 const (
 	FlagAddr    = "addr"
 	KeyAddr     = KeyPrefix + "addr"
 	DefaultAddr = ":80"
 )
 
-// Secure Address flags, configuration keys and defaults.
+// Secure Address flag, configuration key and default.
 const (
 	FlagSecureAddr    = "secure-addr"
 	KeySecureAddr     = KeyPrefix + "secureAddr"
 	DefaultSecureAddr = ":443"
+)
+
+// Services Queue Name flag and configuration key.
+const (
+	FlagServicesQueueName = "services-queue-name"
+	KeyServicesQueueName  = KeyPrefix + "servicesQueueName"
+)
+
+// Services Queue Name flag and configuration key.
+const (
+	FlagFrontendsQueueName = "frontends-queue-name"
+	KeyFrontendsQueueName  = KeyPrefix + "frontendsQueueName"
 )
 
 func init() {
@@ -93,6 +106,14 @@ func init() {
 
 	viper.SetDefault(KeySecureAddr, DefaultSecureAddr)
 	viper.BindPFlag(KeySecureAddr, runCmd.Flags().Lookup(FlagSecureAddr))
+
+	// Services Queue Name flag and configuration
+	runCmd.Flags().StringP(FlagServicesQueueName, "q", "", "SQS Queue Name on which the Service Events are published")
+	viper.BindPFlag(KeyServicesQueueName, runCmd.Flags().Lookup(FlagServicesQueueName))
+
+	// Services Queue Name flag and configuration
+	runCmd.Flags().StringP(FlagFrontendsQueueName, "f", "", "SQS Queue Name on which the Frontend Events are published")
+	viper.BindPFlag(KeyFrontendsQueueName, runCmd.Flags().Lookup(FlagFrontendsQueueName))
 }
 
 func run(cmd *cobra.Command, args []string) {
@@ -123,12 +144,17 @@ func run(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	serviceRepository, err := services.NewServiceRepository(ecsAPI)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	serviceWatcher, err := common.NewSqsWatcher(ctx, sqsAPI, viper.GetString(KeyServicesQueueName))
+
+	serviceRepository, err := services.NewServiceRepository(ecsAPI, serviceWatcher)
 	if err != nil {
 		logger.
 			WithError(err).
 			Fatal("creating service repository")
 
+		cancel()
 		return
 	}
 
@@ -141,12 +167,18 @@ func run(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	frontendRepository, err := frontends.NewFrontendRepository(dynAPI, viper.GetString("dyndbFrontendsTable"))
+	frontendWatcher, err := common.NewSqsWatcher(ctx, sqsAPI, viper.GetString(KeyFrontendsQueueName))
+
+	frontendRepository, err := frontends.NewFrontendRepository(
+		dynAPI,
+		viper.GetString("dyndbFrontendsTable"),
+		frontendWatcher)
 	if err != nil {
 		logger.
 			WithError(err).
 			Fatal("creating frontend repository")
 
+		cancel()
 		return
 	}
 
@@ -166,10 +198,9 @@ func run(cmd *cobra.Command, args []string) {
 	if err != nil {
 		logger.WithError(err).Fatal("creating start proxy command")
 
+		cancel()
 		return
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
 
 	wg := &sync.WaitGroup{}
 

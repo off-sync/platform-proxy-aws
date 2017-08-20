@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/off-sync/platform-proxy-aws/interfaces"
 )
 
@@ -61,6 +62,8 @@ func NewSqsWatcher(
 				if msgs, err := sw.api.ReceiveMessageWithContext(ctx, sw.queueURL); err == nil {
 					for _, msg := range msgs {
 						sw.Publish(msg)
+
+						sw.api.DeleteMessage(sw.queueURL, aws.StringValue(msg.ReceiptHandle))
 					}
 				}
 			}

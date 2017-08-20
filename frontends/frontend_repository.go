@@ -147,11 +147,10 @@ func (r *FrontendRepository) Subscribe() <-chan appInterfaces.FrontendEvent {
 		sub := r.sqsWatcher.Subscribe()
 
 		for {
-			select {
-			case e := <-sub:
-				if sqsMsg, ok := e.(*sqs.Message); ok {
-					sendFrontendEvent(feChan, sqsMsg)
-				}
+			e := <-sub
+
+			if sqsMsg, ok := e.(*sqs.Message); ok {
+				sendFrontendEvent(feChan, sqsMsg)
 			}
 		}
 	}()
@@ -159,17 +158,22 @@ func (r *FrontendRepository) Subscribe() <-chan appInterfaces.FrontendEvent {
 	return feChan
 }
 
-type frontendEventBody struct {
-	Message struct {
-		Frontends []string `json:"Frontends"`
-	} `json:"Message"`
+type frontendEventMessage struct {
+	Frontends []string `json:"Frontends"`
 }
 
 func sendFrontendEvent(feChan chan<- appInterfaces.FrontendEvent, sqsMsg *sqs.Message) {
-	msg := &frontendEventBody{}
-	if err := json.Unmarshal([]byte(aws.StringValue(sqsMsg.Body)), msg); err == nil {
-		for _, name := range msg.Message.Frontends {
-			feChan <- appInterfaces.FrontendEvent{Name: name}
-		}
+	body := &common.SqsMessageBody{}
+	if err := json.Unmarshal([]byte(aws.StringValue(sqsMsg.Body)), body); err != nil {
+		return
+	}
+
+	msg := &frontendEventMessage{}
+	if err := json.Unmarshal([]byte(body.Message), msg); err != nil {
+		return
+	}
+
+	for _, name := range msg.Frontends {
+		feChan <- appInterfaces.FrontendEvent{Name: name}
 	}
 }

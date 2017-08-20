@@ -181,7 +181,7 @@ func TestDescribeServiceShouldReturnErrorOnInvalidPort(t *testing.T) {
 
 func TestSubscribe(t *testing.T) {
 	r, _, sqsAPI := setUp(t)
-	sqsAPI.Messages["msg1"] = &sqs.Message{Body: aws.String(`{"Message":{"Services":["test1"]}}`)}
+	sqsAPI.Messages["msg1"] = &sqs.Message{Body: aws.String(`{"Message":"{\"Services\":[\"test1\"]}"}`)}
 
 	sub := r.Subscribe()
 

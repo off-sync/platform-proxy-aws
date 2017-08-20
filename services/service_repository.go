@@ -183,11 +183,15 @@ func (r *ServiceRepository) Subscribe() <-chan appInterfaces.ServiceEvent {
 		sub := r.sqsWatcher.Subscribe()
 
 		for {
-			select {
-			case e := <-sub:
-				if sqsMsg, ok := e.(*sqs.Message); ok {
-					sendServiceEvent(svcChan, sqsMsg)
-				}
+			e := <-sub
+
+			if e == nil {
+				// subscription was cancelled
+				return
+			}
+
+			if sqsMsg, ok := e.(*sqs.Message); ok {
+				sendServiceEvent(svcChan, sqsMsg)
 			}
 		}
 	}()
@@ -195,17 +199,22 @@ func (r *ServiceRepository) Subscribe() <-chan appInterfaces.ServiceEvent {
 	return svcChan
 }
 
-type serviceEventBody struct {
-	Message struct {
-		Services []string `json:"Services"`
-	} `json:"Message"`
+type serviceEventMessage struct {
+	Services []string `json:"Services"`
 }
 
 func sendServiceEvent(svcChan chan<- appInterfaces.ServiceEvent, sqsMsg *sqs.Message) {
-	msg := &serviceEventBody{}
-	if err := json.Unmarshal([]byte(aws.StringValue(sqsMsg.Body)), msg); err == nil {
-		for _, name := range msg.Message.Services {
-			svcChan <- appInterfaces.ServiceEvent{Name: name}
-		}
+	body := &common.SqsMessageBody{}
+	if err := json.Unmarshal([]byte(aws.StringValue(sqsMsg.Body)), body); err != nil {
+		return
+	}
+
+	msg := &serviceEventMessage{}
+	if err := json.Unmarshal([]byte(body.Message), msg); err != nil {
+		return
+	}
+
+	for _, name := range msg.Services {
+		svcChan <- appInterfaces.ServiceEvent{Name: name}
 	}
 }
