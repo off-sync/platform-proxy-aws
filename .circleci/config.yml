@@ -35,14 +35,13 @@ jobs:
       - run:
           name: Build Docker image
           command: |
-            TAG=v0.1.$CIRCLE_BUILD_NUM
-            docker build -t off-sync/platform-proxy-aws:$TAG
+            docker build --cache-from=app -t app .
 
       - run:
           name: Save Docker image layer cache
           command: |
             mkdir -p /caches
-            docker save -o /caches/app.tar off-sync/platform-proxy-aws:$TAG
+            docker save -o /caches/app.tar app
 
       - save_cache:
           key: cache-{{ .Environment.VERSION }}-{{ .Branch }}-{{ epoch }}
@@ -66,3 +65,4 @@ jobs:
       #
       # - store_test_results:
       #     path: /tmp/test-results
+#             TAG=$VERSION-$CIRCLE_BUILD_NUM
