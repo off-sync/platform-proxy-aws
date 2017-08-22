@@ -374,17 +374,6 @@
 			"revisionTime": "2017-05-23T03:00:23Z"
 		},
 		{
-			"checksumSHA1": "Q5ScaMWQ3F9w5jSL/82NutBo6+U=",
-			"path": "github.com/off-sync/platform-proxy-app",
-			"revision": "f61bc4ddc85c2a3d12594c64e8466e4574939ec8",
-			"revisionTime": "2017-08-20T16:49:25Z",
-			"tree": true
-		},
-		{
-			"path": "github.com/off-sync/platform-proxy-app^",
-			"revision": ""
-		},
-		{
 			"checksumSHA1": "8Qw4lAldECj+TjSJ5ffyJkM4QPU=",
 			"path": "github.com/off-sync/platform-proxy-domain/frontends",
 			"revision": "2afef7dc2d88a4c097d8e22919ec94c4aac13561",
