@@ -29,7 +29,7 @@ jobs:
       - run:
           name: Load Docker image layer cache
           command: |
-            set -o pipefail
+            set +o pipefail
             docker load -i /caches/app.tar | true
 
       - run:
