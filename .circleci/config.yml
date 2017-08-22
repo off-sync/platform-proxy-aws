@@ -22,7 +22,7 @@ jobs:
 
       - restore_cache:
           keys:
-            - {{ .Environment.VERSION }}-{{ .Branch }}
+            - cache-{{ .Environment.VERSION }}-{{ .Branch }}
           paths:
             - /caches/app.tar
 
@@ -44,7 +44,7 @@ jobs:
             docker save -o /caches/app.tar off-sync/platform-proxy-aws:$TAG
 
       - save_cache:
-          key: {{ .Environment.VERSION }}-{{ .Branch }}-{{ epoch }}
+          key: cache-{{ .Environment.VERSION }}-{{ .Branch }}-{{ epoch }}
           paths:
             - /caches/app.tar
 
