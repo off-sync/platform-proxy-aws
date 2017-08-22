@@ -12,7 +12,9 @@ jobs:
 
     steps:
       - checkout
+
       - setup_remote_docker
+          version: 17.05.0-ce
 
       - run:
           name: Install dependencies
