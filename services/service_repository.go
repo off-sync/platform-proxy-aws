@@ -134,8 +134,18 @@ func (r *ServiceRepository) ListServices() ([]string, error) {
 // exists with that name an ErrUnknownService is returned.
 func (r *ServiceRepository) DescribeService(name string) (*services.Service, error) {
 	service, err := r.api.DescribeService(name)
+
 	if err != nil {
+		if err == interfaces.ErrServiceNotFound {
+			// map API error to interface error
+			return nil, appInterfaces.ErrUnknownService
+		}
+
 		return nil, err
+	}
+
+	if aws.StringValue(service.Status) == "INACTIVE" {
+		return nil, appInterfaces.ErrUnknownService
 	}
 
 	serverURL, err := r.getTaskDefinitionServerURL(aws.StringValue(service.TaskDefinition))

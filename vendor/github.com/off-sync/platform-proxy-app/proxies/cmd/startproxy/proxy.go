@@ -143,8 +143,19 @@ func (p *proxy) configure() {
 			WithError(err).
 			Error("listing services")
 	} else {
+		currentServices := make(map[string]bool)
+
 		for _, service := range services {
 			p.configureService(service)
+
+			currentServices[service] = true
+		}
+
+		for service := range p.serviceHandlers {
+			if _, found := currentServices[service]; !found {
+				// call configure service to have it removed
+				p.configureService(service)
+			}
 		}
 	}
 
@@ -155,8 +166,19 @@ func (p *proxy) configure() {
 			WithError(err).
 			Error("listing frontends")
 	} else {
+		currentFrontends := make(map[string]bool)
+
 		for _, frontend := range frontends {
 			p.configureFrontend(frontend)
+
+			currentFrontends[frontend] = true
+		}
+
+		for frontend := range p.frontendConfigs {
+			if _, found := currentFrontends[frontend]; !found {
+				// call configure frontend to have it removed
+				p.configureFrontend(frontend)
+			}
 		}
 	}
 }

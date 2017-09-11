@@ -2,9 +2,11 @@ package infra
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ecs"
+	"github.com/off-sync/platform-proxy-aws/interfaces"
 	"github.com/spf13/viper"
 )
 
@@ -52,6 +54,11 @@ func (s *AwsEcsSdk) ListServices() ([]string, error) {
 		return nil, err
 	}
 
+	// remove ARN prefix
+	for i, name := range serviceNames {
+		serviceNames[i] = name[strings.LastIndex(name, "/")+1:]
+	}
+
 	return serviceNames, nil
 }
 
@@ -66,7 +73,7 @@ func (s *AwsEcsSdk) DescribeService(serviceArn string) (*ecs.Service, error) {
 	}
 
 	if len(serviceDescription.Services) < 1 {
-		return nil, fmt.Errorf("service not found: %s", serviceArn)
+		return nil, interfaces.ErrServiceNotFound
 	}
 
 	return serviceDescription.Services[0], nil

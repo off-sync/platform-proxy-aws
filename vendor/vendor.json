@@ -308,20 +308,20 @@
 		{
 			"checksumSHA1": "GTCetd27fMTDI++eOhcsuOyVEqM=",
 			"path": "github.com/off-sync/platform-proxy-app/infra/logging",
-			"revision": "5a9814b71efc041df63f9201c8b0840754f1fa2b",
-			"revisionTime": "2017-08-20T16:45:33Z"
+			"revision": "e8d4fc39a8b08c56299b54b3be4e60369abb0da4",
+			"revisionTime": "2017-09-11T18:09:25Z"
 		},
 		{
 			"checksumSHA1": "lxRM4HQq7WrlTq4mG4yNj4GjWDo=",
 			"path": "github.com/off-sync/platform-proxy-app/interfaces",
-			"revision": "5a9814b71efc041df63f9201c8b0840754f1fa2b",
-			"revisionTime": "2017-08-20T16:45:33Z"
+			"revision": "e8d4fc39a8b08c56299b54b3be4e60369abb0da4",
+			"revisionTime": "2017-09-11T18:09:25Z"
 		},
 		{
-			"checksumSHA1": "w/tD4JNu2LDS5VCmZwHfakUKacE=",
+			"checksumSHA1": "hYm2x6HNEjKcSZCZYbQEg6H5Gbg=",
 			"path": "github.com/off-sync/platform-proxy-app/proxies/cmd/startproxy",
-			"revision": "5a9814b71efc041df63f9201c8b0840754f1fa2b",
-			"revisionTime": "2017-08-20T16:45:33Z"
+			"revision": "e8d4fc39a8b08c56299b54b3be4e60369abb0da4",
+			"revisionTime": "2017-09-11T18:09:25Z"
 		},
 		{
 			"checksumSHA1": "+qvxdffFiSBDUebawrn6knVoFEQ=",
