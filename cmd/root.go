@@ -24,8 +24,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/sirupsen/logrus"
 	homedir "github.com/mitchellh/go-homedir"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -84,6 +84,7 @@ func initConfig() {
 		viper.SetConfigName(".platform-proxy-aws")
 	}
 
+	viper.SetEnvPrefix("PLATFORM_PROXY_AWS")
 	viper.AutomaticEnv() // read in environment variables that match
 
 	// If a config file is found, read it in.
