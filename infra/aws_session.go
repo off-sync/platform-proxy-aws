@@ -17,10 +17,17 @@ var (
 
 func getSession() (*session.Session, error) {
 	awsSessionOnce.Do(func() {
-		awsSession, awsSessionErr = session.NewSession(&aws.Config{
-			Credentials: credentials.NewStaticCredentials(viper.GetString(awsID), viper.GetString(awsSecret), ""),
-			Region:      aws.String(viper.GetString(awsRegion)),
-		})
+		cfg := &aws.Config{}
+
+		if viper.GetString(awsID) != "" {
+			cfg.Credentials = credentials.NewStaticCredentials(viper.GetString(awsID), viper.GetString(awsSecret), "")
+		}
+
+		if viper.GetString(awsRegion) != "" {
+			cfg.Region = aws.String(viper.GetString(awsRegion))
+		}
+
+		awsSession, awsSessionErr = session.NewSession(cfg)
 	})
 
 	return awsSession, awsSessionErr
