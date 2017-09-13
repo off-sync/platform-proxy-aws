@@ -7,7 +7,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/off-sync/platform-proxy-aws/interfaces"
-	"github.com/spf13/viper"
 )
 
 // AwsEcsSdk implements the AwsEcsAPI.
@@ -94,13 +93,13 @@ func (s *AwsEcsSdk) DescribeTaskDefinition(taskDefArn string) (*ecs.TaskDefiniti
 // NewAwsEcsSdkFromConfig creates a new AwsEcsSdk using the configuration
 // exposed via viper. The AWS ID, secret, region and cluster name are retrieved
 // from the configuration.
-func NewAwsEcsSdkFromConfig() (*AwsEcsSdk, error) {
-	sess, err := getSession()
+func NewAwsEcsSdkFromConfig(config interfaces.Config) (*AwsEcsSdk, error) {
+	sess, err := getSession(config)
 	if err != nil {
 		return nil, err
 	}
 
 	ecsSvc := ecs.New(sess)
 
-	return NewAwsEcsSdk(ecsSvc, viper.GetString(ecsClusterName))
+	return NewAwsEcsSdk(ecsSvc, config.GetString(ecsClusterName))
 }

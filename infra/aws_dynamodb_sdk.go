@@ -3,6 +3,7 @@ package infra
 import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/off-sync/platform-proxy-aws/interfaces"
 )
 
 // AwsDynamoDBSdk implements the AWS DynamoDB API.
@@ -20,8 +21,8 @@ func NewAwsDynamoDBSdk(dynSvc *dynamodb.DynamoDB) *AwsDynamoDBSdk {
 // NewAwsDynamoDBSdkFromConfig creates a new AwsDynamoDBSdk using the configuration
 // exposed via viper. The AWS ID, secret, region are retrieved from the
 // configuration.
-func NewAwsDynamoDBSdkFromConfig() (*AwsDynamoDBSdk, error) {
-	sess, err := getSession()
+func NewAwsDynamoDBSdkFromConfig(config interfaces.Config) (*AwsDynamoDBSdk, error) {
+	sess, err := getSession(config)
 	if err != nil {
 		return nil, err
 	}

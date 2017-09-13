@@ -117,7 +117,7 @@ func init() {
 }
 
 func run(cmd *cobra.Command, args []string) {
-	ecsAPI, err := infra.NewAwsEcsSdkFromConfig()
+	ecsAPI, err := infra.NewAwsEcsSdkFromConfig(viper.GetViper())
 	if err != nil {
 		logger.
 			WithError(err).
@@ -126,7 +126,7 @@ func run(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	dynAPI, err := infra.NewAwsDynamoDBSdkFromConfig()
+	dynAPI, err := infra.NewAwsDynamoDBSdkFromConfig(viper.GetViper())
 	if err != nil {
 		logger.
 			WithError(err).
@@ -135,7 +135,7 @@ func run(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	sqsAPI, err := infra.NewAwsSqsSdkFromConfig()
+	sqsAPI, err := infra.NewAwsSqsSdkFromConfig(viper.GetViper())
 	if err != nil {
 		logger.
 			WithError(err).

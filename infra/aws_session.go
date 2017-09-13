@@ -6,7 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/spf13/viper"
+	"github.com/off-sync/platform-proxy-aws/interfaces"
 )
 
 var (
@@ -15,16 +15,17 @@ var (
 	awsSessionErr  error
 )
 
-func getSession() (*session.Session, error) {
+func getSession(config interfaces.Config) (*session.Session, error) {
 	awsSessionOnce.Do(func() {
 		cfg := &aws.Config{}
 
-		if viper.GetString(awsID) != "" {
-			cfg.Credentials = credentials.NewStaticCredentials(viper.GetString(awsID), viper.GetString(awsSecret), "")
+		if (config.GetString(awsID) != "") &&
+			(config.GetString(awsSecret) != "") {
+			cfg.Credentials = credentials.NewStaticCredentials(config.GetString(awsID), config.GetString(awsSecret), "")
 		}
 
-		if viper.GetString(awsRegion) != "" {
-			cfg.Region = aws.String(viper.GetString(awsRegion))
+		if config.GetString(awsRegion) != "" {
+			cfg.Region = aws.String(config.GetString(awsRegion))
 		}
 
 		awsSession, awsSessionErr = session.NewSession(cfg)

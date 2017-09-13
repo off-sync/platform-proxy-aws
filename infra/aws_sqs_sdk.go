@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/off-sync/platform-proxy-aws/interfaces"
 )
 
 // Errors.
@@ -50,8 +51,8 @@ func NewAwsSqsSdk(sqsSvc *sqs.SQS, options ...AwsSqsSdkOption) (*AwsSqsSdk, erro
 }
 
 // NewAwsSqsSdkFromConfig creates a new AWS SQS SDK from configuration.
-func NewAwsSqsSdkFromConfig() (*AwsSqsSdk, error) {
-	sess, err := getSession()
+func NewAwsSqsSdkFromConfig(config interfaces.Config) (*AwsSqsSdk, error) {
+	sess, err := getSession(config)
 	if err != nil {
 		return nil, err
 	}
