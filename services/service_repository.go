@@ -42,9 +42,10 @@ type ServiceRepository struct {
 	api interfaces.AwsEcsAPI
 
 	// Configuration
-	serverContainerName string
-	dockerLabelPort     string
-	defaultPort         int
+	serverContainerName    string
+	dockerLabelPort        string
+	dockerLabelServiceType string
+	defaultPort            int
 
 	sqsWatcher *common.SqsWatcher
 }
@@ -57,9 +58,10 @@ var (
 
 // Default values for the ServiceRepository struct.
 const (
-	DefaultServerContainerName = "server"
-	DefaultDockerLabelPort     = "com.off-sync.platform.proxy.port"
-	DefaultDefaultPort         = 8080
+	DefaultServerContainerName    = "server"
+	DefaultDockerLabelPort        = "com.off-sync.platform.proxy.port"
+	DefaultDockerLabelServiceType = "com.off-sync.platform.proxy.serviceType"
+	DefaultDefaultPort            = 8080
 )
 
 // ServiceRepositoryOption defines the type used to further configure a
@@ -81,11 +83,12 @@ func NewServiceRepository(
 	}
 
 	r := &ServiceRepository{
-		api:                 api,
-		sqsWatcher:          sqsWatcher,
-		serverContainerName: DefaultServerContainerName,
-		dockerLabelPort:     DefaultDockerLabelPort,
-		defaultPort:         DefaultDefaultPort,
+		api:                    api,
+		sqsWatcher:             sqsWatcher,
+		serverContainerName:    DefaultServerContainerName,
+		dockerLabelPort:        DefaultDockerLabelPort,
+		dockerLabelServiceType: DefaultDockerLabelServiceType,
+		defaultPort:            DefaultDefaultPort,
 	}
 
 	for _, opt := range options {
@@ -148,21 +151,27 @@ func (r *ServiceRepository) DescribeService(name string) (*services.Service, err
 		return nil, appInterfaces.ErrUnknownService
 	}
 
-	serverURL, err := r.getTaskDefinitionServerURL(aws.StringValue(service.TaskDefinition))
+	serviceType, serverURL, err := r.parseTaskDefinition(aws.StringValue(service.TaskDefinition))
 	if err != nil {
 		return nil, err
 	}
 
-	return services.NewService(name, serverURL)
+	return services.NewService(name, serviceType, serverURL)
 }
 
-func (r *ServiceRepository) getTaskDefinitionServerURL(taskDefArn string) (string, error) {
+func (r *ServiceRepository) parseTaskDefinition(taskDefArn string) (services.ServiceType, string, error) {
 	tdef, err := r.api.DescribeTaskDefinition(taskDefArn)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	for _, cdef := range tdef.ContainerDefinitions {
+		if typeLabel, found := cdef.DockerLabels[r.dockerLabelServiceType]; found &&
+			aws.StringValue(typeLabel) == string(services.ServiceTypeSystem) {
+			// this is a system service
+			return services.ServiceTypeSystem, "", nil
+		}
+
 		if aws.StringValue(cdef.Name) != r.serverContainerName {
 			// not the server
 			continue
@@ -174,14 +183,14 @@ func (r *ServiceRepository) getTaskDefinitionServerURL(taskDefArn string) (strin
 		if found {
 			port, err = strconv.Atoi(*portLabel)
 			if err != nil {
-				return "", fmt.Errorf("invalid port: %s", *portLabel)
+				return "", "", fmt.Errorf("invalid port: %s", *portLabel)
 			}
 		}
 
-		return fmt.Sprintf("http://%s:%d", *cdef.Hostname, port), nil
+		return services.ServiceTypeServer, fmt.Sprintf("http://%s:%d", *cdef.Hostname, port), nil
 	}
 
-	return "", fmt.Errorf("no server container found for task definition: %s", taskDefArn)
+	return services.ServiceTypeUnsupported, "", nil
 }
 
 // Subscribe returns a channel through which frontend events will
